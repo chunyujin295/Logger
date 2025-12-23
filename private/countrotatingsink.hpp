@@ -6,8 +6,8 @@
   * Date：2025/11/18
   * Update：调整文件命名规则：首文件无数字后缀，第二个文件开始按 .1.log 递增
   ************************************************/
-#ifndef COREXI_COMMON_PC_COUNTROTATINGSINK_HPP
-#define COREXI_COMMON_PC_COUNTROTATINGSINK_HPP
+#ifndef COUNTROTATINGSINK_HPP
+#define COUNTROTATINGSINK_HPP
 
 #include <filesystem>
 #include <fstream>
@@ -234,4 +234,4 @@ namespace CustomSink
     };
 } // namespace CustomSink
 
-#endif // COREXI_COMMON_PC_COUNTROTATINGSINK_HPP
+#endif //COUNTROTATINGSINK_HPP

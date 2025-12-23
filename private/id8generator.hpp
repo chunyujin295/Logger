@@ -6,8 +6,8 @@
   * Date：2025/10/31
   * Update：
   * ************************************************/
-#ifndef COREXI_COMMON_PC_ID8GENERATOR_H
-#define COREXI_COMMON_PC_ID8GENERATOR_H
+#ifndef ID8GENERATOR_H
+#define D8GENERATOR_H
 
 #include <atomic>
 #include <chrono>
@@ -83,4 +83,4 @@ private:
     }
 };
 
-#endif//COREXI_COMMON_PC_ID8GENERATOR_H
+#endif//ID8GENERATOR_H

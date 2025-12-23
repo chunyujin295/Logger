@@ -6,11 +6,10 @@
   * Date：2025/9/2
   * Update：
   * ************************************************/
-#ifndef COREXI_COMMON_PC_LOGGER_P_H
-#define COREXI_COMMON_PC_LOGGER_P_H
+#ifndef LOGGER_P_H
+#define LOGGER_P_H
 #include "id8generator.hpp"
-#include "yamltool/yamltool_p.h"
-#include <common/logger/logger.h>
+#include <logger/logger.h>
 #include <memory>
 #include <mutex>
 #include <spdlog/spdlog.h>
@@ -215,4 +214,4 @@ private:
 	static ID8Generator m_id8Generator;
 };
 
-#endif//COREXI_COMMON_PC_LOGGER_P_H
+#endif//LOGGER_P_H

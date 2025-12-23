@@ -6,11 +6,11 @@
   * Date：2025/9/2
   * Update：
   * ************************************************/
-#ifndef COREXI_COMMON_PC_LOGGER_H
-#define COREXI_COMMON_PC_LOGGER_H
+#ifndef LOGGER_H
+#define LOGGER_H
 
 #include <any>
-#include <common/export.h>
+#include "export.h"
 #include <functional>
 #include <string>
 
@@ -41,7 +41,7 @@ struct LogMsg
 };
 
 
-class CXI_COMMON_EXPORT Logger// PIMPL模式，但没有对象指针，因为对外接口都是静态的
+class LOGGER_API Logger// PIMPL模式，但没有对象指针，因为对外接口都是静态的
 {
 public:
 	/**
@@ -142,4 +142,4 @@ public:
 #define LOG_ERROR(...) Logger::error(GET_LINE, {__VA_ARGS__})   // 同上 [error级别]
 #define LOG_CRITI(...) Logger::critical(GET_LINE, {__VA_ARGS__})// 同上 [critical级别]
 
-#endif//COREXI_COMMON_PC_LOGGER_H
+#endif//LOGGER_H

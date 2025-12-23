@@ -1,0 +1,12 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# 不需要链接yaml-tool，因为在cmake中通过PRIVATE私有化链接的
+# 所有符号已经被合并进 yaml_tool
+# 没有运行时依赖
+# 没有编译期接口暴露
+# 用户既不需要 headers，也不需要 targets
+find_dependency(yaml-tool)
+
+include("${CMAKE_CURRENT_LIST_DIR}/LoggerTargets.cmake")

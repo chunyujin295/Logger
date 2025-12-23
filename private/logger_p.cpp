@@ -1,5 +1,6 @@
 #include "logger_p.h"
 #include "countrotatingsink.hpp"
+
 #include <spdlog/logger.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/callback_sink.h>
@@ -7,6 +8,8 @@
 #include <spdlog/sinks/ostream_sink.h>
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
+
+#include <yamltool/yamltool.h>
 
 #include <codecvt>
 #include <cstdarg>
@@ -19,7 +22,7 @@
 #include <numeric>
 #include <regex>
 #include <unordered_set>
-#include <QString>
+// #include <QString>
 
 namespace
 {
@@ -146,10 +149,10 @@ namespace
 			{
 				return std::to_string(std::any_cast<uint64_t>(data));
 			}
-			if (data.type() == typeid(QString))
-			{
-				return std::any_cast<QString>(data).toStdString();
-			}
+			// if (data.type() == typeid(QString))
+			// {
+			// 	return std::any_cast<QString>(data).toStdString();
+			// }
 			LOG_WARN("anythingToString 类型转换失败");// 如果不为空且没有匹配上类型
 			return {};
 		}
@@ -578,17 +581,17 @@ void LogPrivate::loadConfigFile(const std::string& configFilePath)
 {
 	this->m_logger.reset();//重新设置日志
 
-	Config::YamlNode rootNode;
-	if (!Config::YamlTool::loadFile(rootNode, configFilePath))
+	YamlTool::YamlNode rootNode;
+	if (!YamlTool::YamlTool::loadFile(rootNode, configFilePath))
 	{
 		throw spdlog::spdlog_ex("加载日志yaml配置文件失败，路径：" + std::filesystem::absolute(configFilePath).string());
 	}
-	Config::YamlNode logConfigNode = Config::YamlTool::getNode(rootNode, "log_config");
+	YamlTool::YamlNode logConfigNode = YamlTool::YamlTool::getNode(rootNode, "log_config");
 	if (!logConfigNode.isDefined() || logConfigNode.isNull())
 	{
 		throw spdlog::spdlog_ex("日志yaml配置文件中, <LogConfig> 节点未定义或为空");
 	}
-	Config::YamlNode loggerNode = Config::YamlTool::getNode(logConfigNode, "logger");
+	YamlTool::YamlNode loggerNode = YamlTool::YamlTool::getNode(logConfigNode, "logger");
 	if (!loggerNode.isDefined() || loggerNode.isNull())
 	{
 		throw spdlog::spdlog_ex("日志yaml配置文件中, <Logger> 节点未定义或为空");
@@ -598,37 +601,37 @@ void LogPrivate::loadConfigFile(const std::string& configFilePath)
 
 	m_configFilePath = configFilePath;
 	// 获取logger名称
-	auto loggerName = Config::YamlTool::getDef<std::string>(loggerNode, "name", "default-logger");
+	auto loggerName = YamlTool::YamlTool::getDef<std::string>(loggerNode, "name", "default-logger");
 
 	// 获取DEBUG模式下logger过滤级别
-	auto debugLevelStr = Config::YamlTool::getDef<std::string>(loggerNode, "debug_level", "trace");
+	auto debugLevelStr = YamlTool::YamlTool::getDef<std::string>(loggerNode, "debug_level", "trace");
 	spdlog::level::level_enum debugLevel = spdlog::level::from_str(debugLevelStr);
 
 	// 获取RELEASE模式下logger过滤级别
-	auto releaseLevelStr = Config::YamlTool::getDef<std::string>(loggerNode, "release_level", "info");
+	auto releaseLevelStr = YamlTool::YamlTool::getDef<std::string>(loggerNode, "release_level", "info");
 	spdlog::level::level_enum releaseLevel = spdlog::level::from_str(releaseLevelStr);
 
 	// 获取flush_on级别
-	auto flushOnStr = Config::YamlTool::getDef<std::string>(loggerNode, "flush_on", "trace");
+	auto flushOnStr = YamlTool::YamlTool::getDef<std::string>(loggerNode, "flush_on", "trace");
 	spdlog::level::level_enum flushOn = spdlog::level::from_str(flushOnStr);
 
 	// 获取输出格式
-	auto logPatternStr = Config::YamlTool::getDef<std::string>(loggerNode, "pattern",
+	auto logPatternStr = YamlTool::YamlTool::getDef<std::string>(loggerNode, "pattern",
 															   "[%Y-%m-%d %H:%M:%S.%e][%n][%^%l%$][thread %t]%v");
 
 	// 获取各级别日志是否按照输出格式输出
-	Config::YamlNode showCodeLineNode = Config::YamlTool::getNode(logConfigNode, "showCodeLine");
+	YamlTool::YamlNode showCodeLineNode = YamlTool::YamlTool::getNode(logConfigNode, "showCodeLine");
 	if (showCodeLineNode.isDefined() && !showCodeLineNode.isNull())
 	{
-		m_traceShowLine = Config::YamlTool::getDef<bool>(showCodeLineNode, "trace", false);
-		m_debugShowLine = Config::YamlTool::getDef<bool>(showCodeLineNode, "debug", false);
-		m_infoShowLine = Config::YamlTool::getDef<bool>(showCodeLineNode, "info", false);
-		m_warnShowLine = Config::YamlTool::getDef<bool>(showCodeLineNode, "warn", true);
-		m_errorShowLine = Config::YamlTool::getDef<bool>(showCodeLineNode, "error", true);
-		m_criticalShowLine = Config::YamlTool::getDef<bool>(showCodeLineNode, "critical", true);
+		m_traceShowLine = YamlTool::YamlTool::getDef<bool>(showCodeLineNode, "trace", false);
+		m_debugShowLine = YamlTool::YamlTool::getDef<bool>(showCodeLineNode, "debug", false);
+		m_infoShowLine = YamlTool::YamlTool::getDef<bool>(showCodeLineNode, "info", false);
+		m_warnShowLine = YamlTool::YamlTool::getDef<bool>(showCodeLineNode, "warn", true);
+		m_errorShowLine = YamlTool::YamlTool::getDef<bool>(showCodeLineNode, "error", true);
+		m_criticalShowLine = YamlTool::YamlTool::getDef<bool>(showCodeLineNode, "critical", true);
 	}
 
-	Config::YamlNode sinksNode = Config::YamlTool::getNode(logConfigNode, "sinks");
+	YamlTool::YamlNode sinksNode = YamlTool::YamlTool::getNode(logConfigNode, "sinks");
 	std::vector<std::shared_ptr<spdlog::sinks::sink>> sinks;
 
 	if (!sinksNode.isDefined() || sinksNode.isNull() || !sinksNode.isSequence())
@@ -648,7 +651,7 @@ void LogPrivate::loadConfigFile(const std::string& configFilePath)
 		{
 			for (std::size_t i = 0; i < sinksNode.size(); ++i)
 			{
-				Config::YamlNode sinkNode = Config::YamlTool::getSequenceNode(sinksNode, i);
+				YamlTool::YamlNode sinkNode = YamlTool::YamlTool::getSequenceNode(sinksNode, i);
 				if (!sinkNode.isDefined() || sinkNode.isNull())
 				{
 					std::cout << "[LogPrivate] sinkNode is not exist, index: " + std::to_string(i);
@@ -656,9 +659,9 @@ void LogPrivate::loadConfigFile(const std::string& configFilePath)
 				}
 				else
 				{
-					// auto name = Config::YamlTool::getDef<std::string>(sinkNode, "name", "");
-					auto type = Config::YamlTool::getDef<std::string>(sinkNode, "type", "");
-					auto sinkLevel = spdlog::level::from_str(Config::YamlTool::getDef<std::string>(sinkNode, "level", "trace"));
+					// auto name = YamlTool::YamlTool::getDef<std::string>(sinkNode, "name", "");
+					auto type = YamlTool::YamlTool::getDef<std::string>(sinkNode, "type", "");
+					auto sinkLevel = spdlog::level::from_str(YamlTool::YamlTool::getDef<std::string>(sinkNode, "level", "trace"));
 
 					// 注意，spdlog默认支持两种sink：多线程mt和单线程st，mt虽然性能比st低，但多线程安全，因此默认使用mt，不再使用st
 					if (type == SINK_TYPE_STDOUT_COLOR_SINK_MT)// 控制台sink
@@ -670,17 +673,17 @@ void LogPrivate::loadConfigFile(const std::string& configFilePath)
 
 					else if (type == SINK_TYPE_DAILY_FILE_MT)// 日期分割文件sink
 					{
-						auto filePath = Config::YamlTool::getDef<std::string>(sinkNode, "file_path", "");
+						auto filePath = YamlTool::YamlTool::getDef<std::string>(sinkNode, "file_path", "");
 						if (filePath.empty())
 						{
 							std::cout << "[LogPrivate] file_path is empty, index: " + std::to_string(i);
 							continue;
 						}
-						int rotationHour = Config::YamlTool::getDef<int>(sinkNode, "rotation_hour", 0);
-						int rotationMin = Config::YamlTool::getDef<int>(sinkNode, "rotation_min", 0);
+						int rotationHour = YamlTool::YamlTool::getDef<int>(sinkNode, "rotation_hour", 0);
+						int rotationMin = YamlTool::YamlTool::getDef<int>(sinkNode, "rotation_min", 0);
 
-						int maxDays = Config::YamlTool::getDef<int>(sinkNode, "max_days", 0);
-						auto truncate = Config::YamlTool::getDef<bool>(sinkNode, "truncate", false);// 是否清空截断，false则下次打开追加写入
+						int maxDays = YamlTool::YamlTool::getDef<int>(sinkNode, "max_days", 0);
+						auto truncate = YamlTool::YamlTool::getDef<bool>(sinkNode, "truncate", false);// 是否清空截断，false则下次打开追加写入
 
 						auto fileSink = std::make_shared<spdlog::sinks::daily_file_sink_mt>(filePath, rotationHour, rotationMin, truncate, maxDays);
 						fileSink->set_level(sinkLevel);
@@ -688,15 +691,15 @@ void LogPrivate::loadConfigFile(const std::string& configFilePath)
 					}
 					else if (type == SINK_TYPE_ROTATING_FILE_MT)// 滚动文件sink
 					{
-						auto filePath = Config::YamlTool::getDef<std::string>(sinkNode, "file_path", "");
+						auto filePath = YamlTool::YamlTool::getDef<std::string>(sinkNode, "file_path", "");
 						if (filePath.empty())
 						{
 							std::cout << "[LogPrivate] file_path is empty, index: " + std::to_string(i);
 							continue;
 						}
-						int maxSize = Config::YamlTool::getDef<int>(sinkNode, "max_size", 10485760);
-						int maxFiles = Config::YamlTool::getDef<int>(sinkNode, "max_files", 10);
-						auto rotateOnOpen = Config::YamlTool::getDef<bool>(sinkNode, "rotate_on_open", false);// 是否在 logger 初始化时就立刻进行一次滚动
+						int maxSize = YamlTool::YamlTool::getDef<int>(sinkNode, "max_size", 10485760);
+						int maxFiles = YamlTool::YamlTool::getDef<int>(sinkNode, "max_files", 10);
+						auto rotateOnOpen = YamlTool::YamlTool::getDef<bool>(sinkNode, "rotate_on_open", false);// 是否在 logger 初始化时就立刻进行一次滚动
 						auto fileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(filePath, maxSize, maxFiles, rotateOnOpen);
 						fileSink->set_level(sinkLevel);
 						sinks.push_back(fileSink);
@@ -704,27 +707,27 @@ void LogPrivate::loadConfigFile(const std::string& configFilePath)
 					else if (type == SINK_TYPE_BASIC_FILE_SINK_MT)
 					{
 
-						auto filePath = Config::YamlTool::getDef<std::string>(sinkNode, "file_path", "");
+						auto filePath = YamlTool::YamlTool::getDef<std::string>(sinkNode, "file_path", "");
 						if (filePath.empty())
 						{
 							std::cout << "[LogPrivate] file_path is empty, index: " + std::to_string(i);
 							continue;
 						}
 
-						auto truncate = Config::YamlTool::getDef<bool>(sinkNode, "truncate", false);// 是否清空截断，false则下次打开追加写入
+						auto truncate = YamlTool::YamlTool::getDef<bool>(sinkNode, "truncate", false);// 是否清空截断，false则下次打开追加写入
 						auto fileSink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(filePath, truncate);
 					}
 					else if (type == SINK_TYPE_COUNT_ROTATING_FILE_MT)// 按行数滚动的日志文件sink
 					{
-						auto filePath = Config::YamlTool::getDef<std::string>(sinkNode, "file_path", "");
+						auto filePath = YamlTool::YamlTool::getDef<std::string>(sinkNode, "file_path", "");
 						if (filePath.empty())
 						{
 							std::cout << "[LogPrivate] file_path is empty, index: " + std::to_string(i);
 							continue;
 						}
-						int maxCount = Config::YamlTool::getDef<int>(sinkNode, "max_count", 100000);
-						int maxFiles = Config::YamlTool::getDef<int>(sinkNode, "max_files", 10);
-						auto rotateOnOpen = Config::YamlTool::getDef<bool>(sinkNode, "rotate_on_open", false);// 是否在 logger 初始化时就立刻进行一次滚动
+						int maxCount = YamlTool::YamlTool::getDef<int>(sinkNode, "max_count", 100000);
+						int maxFiles = YamlTool::YamlTool::getDef<int>(sinkNode, "max_files", 10);
+						auto rotateOnOpen = YamlTool::YamlTool::getDef<bool>(sinkNode, "rotate_on_open", false);// 是否在 logger 初始化时就立刻进行一次滚动
 						auto fileSink = std::make_shared<CustomSink::count_rotating_file_mt<std::mutex>>(filePath, maxCount, maxFiles, rotateOnOpen);
 						fileSink->set_level(sinkLevel);
 						sinks.push_back(fileSink);
@@ -842,74 +845,74 @@ void LogPrivate::defaultConfig(const std::string& configFilePath)
 	std::string countRotatingSinkMaxFiles = "5";
 	std::string countRotatingSinkRotateOnOpen = "false";
 
-	Config::YamlNode rootNode;
-	Config::YamlNode logConfigNode;
-	Config::YamlNode loggerNode;
-	Config::YamlNode showCodeLineNode;
-	Config::YamlNode sinksNode;
+	YamlTool::YamlNode rootNode;
+	YamlTool::YamlNode logConfigNode;
+	YamlTool::YamlNode loggerNode;
+	YamlTool::YamlNode showCodeLineNode;
+	YamlTool::YamlNode sinksNode;
 
-	Config::YamlTool::setDef<std::string>(loggerNode, "name", loggerName);
-	Config::YamlTool::setDef<std::string>(loggerNode, "debug_level", debugLevel);
-	Config::YamlTool::setDef<std::string>(loggerNode, "release_level", releaseLevel);
-	Config::YamlTool::setDef<std::string>(loggerNode, "flush_on", flushOn);
-	Config::YamlTool::setDef<std::string>(loggerNode, "pattern", logPatternStr);
+	YamlTool::YamlTool::setDef<std::string>(loggerNode, "name", loggerName);
+	YamlTool::YamlTool::setDef<std::string>(loggerNode, "debug_level", debugLevel);
+	YamlTool::YamlTool::setDef<std::string>(loggerNode, "release_level", releaseLevel);
+	YamlTool::YamlTool::setDef<std::string>(loggerNode, "flush_on", flushOn);
+	YamlTool::YamlTool::setDef<std::string>(loggerNode, "pattern", logPatternStr);
 
-	Config::YamlTool::setDef<std::string>(showCodeLineNode, "trace", traceShowLine);
-	Config::YamlTool::setDef<std::string>(showCodeLineNode, "debug", debugShowLine);
-	Config::YamlTool::setDef<std::string>(showCodeLineNode, "info", infoShowLine);
-	Config::YamlTool::setDef<std::string>(showCodeLineNode, "warn", warnShowLine);
-	Config::YamlTool::setDef<std::string>(showCodeLineNode, "error", errorShowLine);
-	Config::YamlTool::setDef<std::string>(showCodeLineNode, "critical", criticalShowLine);
+	YamlTool::YamlTool::setDef<std::string>(showCodeLineNode, "trace", traceShowLine);
+	YamlTool::YamlTool::setDef<std::string>(showCodeLineNode, "debug", debugShowLine);
+	YamlTool::YamlTool::setDef<std::string>(showCodeLineNode, "info", infoShowLine);
+	YamlTool::YamlTool::setDef<std::string>(showCodeLineNode, "warn", warnShowLine);
+	YamlTool::YamlTool::setDef<std::string>(showCodeLineNode, "error", errorShowLine);
+	YamlTool::YamlTool::setDef<std::string>(showCodeLineNode, "critical", criticalShowLine);
 
-	Config::YamlNode stdoutColorNode;
-	Config::YamlTool::setDef<std::string>(stdoutColorNode, "type", stdoutColorSinkType);
-	Config::YamlTool::setDef<std::string>(stdoutColorNode, "level", stdoutColorSinkLevel);
-	Config::YamlTool::pushBack(sinksNode, stdoutColorNode);
+	YamlTool::YamlNode stdoutColorNode;
+	YamlTool::YamlTool::setDef<std::string>(stdoutColorNode, "type", stdoutColorSinkType);
+	YamlTool::YamlTool::setDef<std::string>(stdoutColorNode, "level", stdoutColorSinkLevel);
+	YamlTool::YamlTool::pushBack(sinksNode, stdoutColorNode);
 
-	Config::YamlNode rotatingNode;
-	Config::YamlTool::setDef<std::string>(rotatingNode, "type", rotatingSinkType);
-	Config::YamlTool::setDef<std::string>(rotatingNode, "file_path", rotatingSinkFilePath);
-	Config::YamlTool::setDef<std::string>(rotatingNode, "level", rotatingSinkLevel);
-	Config::YamlTool::setDef<std::string>(rotatingNode, "max_size", rotatingSinkMaxSize);
-	Config::YamlTool::setDef<std::string>(rotatingNode, "max_files", rotatingSinkMaxFiles);
-	Config::YamlTool::setDef<std::string>(rotatingNode, "rotate_on_open", rotatingSinkRotateOnOpen);
-	Config::YamlTool::pushBack(sinksNode, rotatingNode);
+	YamlTool::YamlNode rotatingNode;
+	YamlTool::YamlTool::setDef<std::string>(rotatingNode, "type", rotatingSinkType);
+	YamlTool::YamlTool::setDef<std::string>(rotatingNode, "file_path", rotatingSinkFilePath);
+	YamlTool::YamlTool::setDef<std::string>(rotatingNode, "level", rotatingSinkLevel);
+	YamlTool::YamlTool::setDef<std::string>(rotatingNode, "max_size", rotatingSinkMaxSize);
+	YamlTool::YamlTool::setDef<std::string>(rotatingNode, "max_files", rotatingSinkMaxFiles);
+	YamlTool::YamlTool::setDef<std::string>(rotatingNode, "rotate_on_open", rotatingSinkRotateOnOpen);
+	YamlTool::YamlTool::pushBack(sinksNode, rotatingNode);
 
-	Config::YamlNode dailyNode;
-	Config::YamlTool::setDef<std::string>(dailyNode, "type", dailySinkType);
-	Config::YamlTool::setDef<std::string>(dailyNode, "file_path", dailySinkFilePath);
-	Config::YamlTool::setDef<std::string>(dailyNode, "level", dailySinkLevel);
-	Config::YamlTool::setDef<std::string>(dailyNode, "rotation_hour", dailySinkRotationHour);
-	Config::YamlTool::setDef<std::string>(dailyNode, "rotation_min", dailySinkRotationMin);
-	Config::YamlTool::setDef<std::string>(dailyNode, "max_days", dailySinkMaxDays);
-	Config::YamlTool::setDef<std::string>(dailyNode, "truncate", dailySinkTruncate);
-	Config::YamlTool::pushBack(sinksNode, dailyNode);
+	YamlTool::YamlNode dailyNode;
+	YamlTool::YamlTool::setDef<std::string>(dailyNode, "type", dailySinkType);
+	YamlTool::YamlTool::setDef<std::string>(dailyNode, "file_path", dailySinkFilePath);
+	YamlTool::YamlTool::setDef<std::string>(dailyNode, "level", dailySinkLevel);
+	YamlTool::YamlTool::setDef<std::string>(dailyNode, "rotation_hour", dailySinkRotationHour);
+	YamlTool::YamlTool::setDef<std::string>(dailyNode, "rotation_min", dailySinkRotationMin);
+	YamlTool::YamlTool::setDef<std::string>(dailyNode, "max_days", dailySinkMaxDays);
+	YamlTool::YamlTool::setDef<std::string>(dailyNode, "truncate", dailySinkTruncate);
+	YamlTool::YamlTool::pushBack(sinksNode, dailyNode);
 
-	Config::YamlNode basicNode;
-	Config::YamlTool::setDef<std::string>(basicNode, "type", basicSinkType);
-	Config::YamlTool::setDef<std::string>(basicNode, "file_path", basicSinkFilePath);
-	Config::YamlTool::setDef<std::string>(basicNode, "level", basicSinkLevel);
-	Config::YamlTool::setDef<std::string>(basicNode, "truncate", basicSinkTruncate);
-	Config::YamlTool::pushBack(sinksNode, basicNode);
+	YamlTool::YamlNode basicNode;
+	YamlTool::YamlTool::setDef<std::string>(basicNode, "type", basicSinkType);
+	YamlTool::YamlTool::setDef<std::string>(basicNode, "file_path", basicSinkFilePath);
+	YamlTool::YamlTool::setDef<std::string>(basicNode, "level", basicSinkLevel);
+	YamlTool::YamlTool::setDef<std::string>(basicNode, "truncate", basicSinkTruncate);
+	YamlTool::YamlTool::pushBack(sinksNode, basicNode);
 
-	Config::YamlNode countRotatingNode;
-	Config::YamlTool::setDef<std::string>(countRotatingNode, "type", countRotatingSinkType);
-	Config::YamlTool::setDef<std::string>(countRotatingNode, "file_path", countRotatingSinkFilePath);
-	Config::YamlTool::setDef<std::string>(countRotatingNode, "level", countRotatingSinkLevel);
-	Config::YamlTool::setDef<std::string>(countRotatingNode, "max_count", countRotatingSinkMaxCount);
-	Config::YamlTool::setDef<std::string>(countRotatingNode, "max_files", countRotatingSinkMaxFiles);
-	Config::YamlTool::setDef<std::string>(countRotatingNode, "rotate_on_open", countRotatingSinkRotateOnOpen);
-	Config::YamlTool::pushBack(sinksNode, countRotatingNode);
+	YamlTool::YamlNode countRotatingNode;
+	YamlTool::YamlTool::setDef<std::string>(countRotatingNode, "type", countRotatingSinkType);
+	YamlTool::YamlTool::setDef<std::string>(countRotatingNode, "file_path", countRotatingSinkFilePath);
+	YamlTool::YamlTool::setDef<std::string>(countRotatingNode, "level", countRotatingSinkLevel);
+	YamlTool::YamlTool::setDef<std::string>(countRotatingNode, "max_count", countRotatingSinkMaxCount);
+	YamlTool::YamlTool::setDef<std::string>(countRotatingNode, "max_files", countRotatingSinkMaxFiles);
+	YamlTool::YamlTool::setDef<std::string>(countRotatingNode, "rotate_on_open", countRotatingSinkRotateOnOpen);
+	YamlTool::YamlTool::pushBack(sinksNode, countRotatingNode);
 
-	Config::YamlTool::addNode(logConfigNode, "logger", loggerNode);
-	Config::YamlTool::addNode(logConfigNode, "showCodeLine", showCodeLineNode);
-	Config::YamlTool::addNode(logConfigNode, "sinks", sinksNode);
+	YamlTool::YamlTool::addNode(logConfigNode, "logger", loggerNode);
+	YamlTool::YamlTool::addNode(logConfigNode, "showCodeLine", showCodeLineNode);
+	YamlTool::YamlTool::addNode(logConfigNode, "sinks", sinksNode);
 
-	Config::YamlTool::addNode(rootNode, "log_config", logConfigNode);
+	YamlTool::YamlTool::addNode(rootNode, "log_config", logConfigNode);
 
 	try
 	{
-		Config::YamlTool::saveAsFile(rootNode, configFilePath);
+		YamlTool::YamlTool::saveAsFile(rootNode, configFilePath);
 		m_configFilePath = configFilePath;
 		std::cout << "[LogPrivate] 默认日志配置文件完成，配置文件路径：" << std::filesystem::absolute(m_configFilePath) << std::endl;
 	}
