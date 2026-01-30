@@ -6,8 +6,8 @@
   * Date：2025/9/2
   * Update：
   * ************************************************/
-#ifndef LOGGER_P_H
-#define LOGGER_P_H
+#ifndef COREXI_COMMON_PC_LOGGER_P_H
+#define COREXI_COMMON_PC_LOGGER_P_H
 #include "id8generator.hpp"
 #include <logger/logger.h>
 #include <memory>
@@ -153,14 +153,14 @@ private:
 	std::shared_ptr<spdlog::logger> getLogger();
 
 	/**
-     * 子程序，用来读取ini配置文件内容
+     * 加载指定路径下的日志配置文件
      */
 	void loadConfigFile(const std::string& configFilePath);
 
 	/**
-     * 子程序，一套默认配置，当配置文件读取失败时调用
+     * 创建和加载默认配置
      */
-	void defaultConfig(const std::string& configFilePath);
+	void loadDefaultConfig(const std::string& configFilePath);
 
 	/**
 	 * 删除旧的配置文件
@@ -214,4 +214,4 @@ private:
 	static ID8Generator m_id8Generator;
 };
 
-#endif//LOGGER_P_H
+#endif//COREXI_COMMON_PC_LOGGER_P_H
