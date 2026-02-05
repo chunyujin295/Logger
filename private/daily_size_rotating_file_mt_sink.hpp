@@ -316,12 +316,21 @@ protected:
 
         const uint64_t will_write = static_cast<uint64_t>(sz) + 1; // + '\n'
 
-        // 5) 写前 size 滚动：仅当 max_files_ > 0 才启用
-        if (max_files_ > 0 && (current_size_bytes_ + will_write > max_size_bytes_))
-        {
-            rotate_by_size_chain_();
-            ensure_opened_for_write_();
-        }
+        // 5) 写前 size 滚动（预判式）：仅当 max_files_ > 0 才启用。
+        // 如果当前条日志写入前，文件超出容量 或 当前日志写入后会超出容量，则触发滚动。这是spdlog推荐的做法
+        // if (max_files_ > 0 && (current_size_bytes_ + will_write > max_size_bytes_))
+        // {
+        //     rotate_by_size_chain_();
+        //     ensure_opened_for_write_();
+        // }
+
+    	// 5) 写前 size 滚动（非预判式）：仅当 max_files_ > 0 才启用
+    	// 语义：只在“当前文件已超限”时才滚动；不考虑本次写入会不会把它写爆。
+    	if (max_files_ > 0 && current_size_bytes_ > max_size_bytes_)
+    	{
+    		rotate_by_size_chain_();
+    		ensure_opened_for_write_();
+    	}
 
         file_.write(buf.data(), static_cast<std::streamsize>(sz));
         file_.put('\n');

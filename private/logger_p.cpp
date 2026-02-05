@@ -563,7 +563,7 @@ void LogPrivate::loadConfigFile(const std::string& configFilePath)
 							std::cout << "[LogPrivate] file_path is empty, index: " + std::to_string(i);
 							continue;
 						}
-						int maxSize = mozi::YamlTool::getDef<int>(sinkNode, "max_size", 52428800);
+						int maxSize = mozi::YamlTool::getDef<int>(sinkNode, "max_size", 52428800) * 8 * 1024;// 单位bit -> KB
 						int maxFiles = mozi::YamlTool::getDef<int>(sinkNode, "max_files", 10);
 						auto rotateOnOpen = mozi::YamlTool::getDef<bool>(sinkNode, "rotate_on_open", false);// 是否在 logger 初始化时就立刻进行一次滚动
 						auto fileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(filePath, maxSize, maxFiles, rotateOnOpen);
@@ -613,7 +613,7 @@ void LogPrivate::loadConfigFile(const std::string& configFilePath)
 						auto dateNameFormat = mozi::YamlTool::getDef<std::string>(sinkNode, "date_name_format", "yyyy-MM-dd");
 						int rotationHour = mozi::YamlTool::getDef<int>(sinkNode, "rotation_hour", 0);
 						int rotationMin = mozi::YamlTool::getDef<int>(sinkNode, "rotation_min", 0);
-						int maxSize = mozi::YamlTool::getDef<int>(sinkNode, "max_size", 52428800);
+						int maxSize = mozi::YamlTool::getDef<int>(sinkNode, "max_size", 52428800) * 8 * 1024;// 单位bit -> KB
 						int maxFiles = mozi::YamlTool::getDef<int>(sinkNode, "max_files", 10);
 						auto rotateOnOpen = mozi::YamlTool::getDef<bool>(sinkNode, "rotate_on_open", false);// 是否在 logger 初始化时就立刻进行一次滚动
 						auto fileSink = std::make_shared<CustomSink::daily_size_rotating_file_mt<std::mutex>>(rootDir,
@@ -698,7 +698,7 @@ void LogPrivate::loadDefaultConfig(const std::string& configFilePath)
 	std::string rotatingSinkType = SINK_TYPE_ROTATING_FILE_MT;
 	std::string rotatingSinkLevel = "trace";
 	std::string rotatingSinkFilePath = "./logs/rotating_file_mt.log";
-	std::string rotatingSinkMaxSize = "52428800";
+	std::string rotatingSinkMaxSize = "10240";
 	std::string rotatingSinkMaxFiles = "5";
 	std::string rotatingSinkRotateOnOpen = "false";
 
@@ -725,7 +725,7 @@ void LogPrivate::loadDefaultConfig(const std::string& configFilePath)
 	std::string dailySizeRotatingSinkDateNameFormat = "yyyy-MM-dd";
 	std::string dailySizeRotatingSinkRotationHour = "0";
 	std::string dailySizeRotatingSinkRotationMin = "0";
-	std::string dailySizeRotatingSinkMaxSize = "52428800";
+	std::string dailySizeRotatingSinkMaxSize = "10240";
 	std::string dailySizeRotatingSinkMaxFiles = "5";
 	std::string dailySizeRotatingSinkRotateOnOpen = "false";
 
