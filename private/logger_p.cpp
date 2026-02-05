@@ -1,6 +1,7 @@
 #include "logger_p.h"
 #include "count_rotating_file_mt_sink.hpp"
-#include "daily_dir_size_rotating_file_sink.hpp"
+// #include "daily_dir_size_rotating_file_sink.hpp"
+#include "daily_size_rotating_file_mt_sink.hpp"
 #include "yamltool/yamlnode.h"
 #include "yamltool/yamltool.h"
 
@@ -25,171 +26,6 @@
 #include <numeric>
 #include <regex>
 #include <unordered_set>
-
-namespace
-{
-
-	/**
-		 * 浮点数转字符串,保留7位有效数字
-		 * @param value
-		 * @return
-		 */
-	inline std::string floatingNumToString(double value)
-	{
-		if (value == 0.0 || value == -0.0)
-		{
-			return "0";
-		}
-
-		std::ostringstream out;
-		int prec = std::numeric_limits<double>::digits10;
-		std::string res;
-		double tmp = value;
-		while (prec >= 7)
-		{
-			out.clear();
-			out.str(std::string());
-			out.precision(prec);//覆盖默认精度
-			out << tmp;
-			std::string str = out.str();//从流中取出字符串
-			res = str;
-			tmp = std::stod(str);
-			prec -= 1;
-		}
-
-		std::replace(res.begin(), res.end(), 'e', 'E');
-		return res;
-	};
-
-	/**
-	 * std::any数据转string
-	 * @param data
-	 * @return
-	 */
-	inline std::string anyToString(const std::any& data)
-	{
-		if (!data.has_value())
-		{
-			return {};
-		}
-		if (data.type() != typeid(nullptr))
-		{
-			if (data.type() == typeid(std::string))
-			{
-				return std::any_cast<std::string>(data);
-			}
-			if (data.type() == typeid(std::string&))
-			{
-				return std::any_cast<std::string>(data);
-			}
-			if (data.type() == typeid(const std::string&))
-			{
-				return std::any_cast<std::string>(data);
-			}
-			if (data.type() == typeid(const char*))// 添加对 const char* 的支持
-			{
-				return std::any_cast<const char*>(data);// 直接返回字符串
-			}
-			if (data.type() == typeid(long))// 添加对 const char* 的支持
-			{
-				return std::to_string(std::any_cast<long>(data));
-			}
-			if (data.type() == typeid(long long))// 添加对 const char* 的支持
-			{
-				return std::to_string(std::any_cast<long long>(data));
-			}
-			if (data.type() == typeid(char*))
-			{
-				return std::any_cast<char*>(data);
-			}
-			if (data.type() == typeid(int))
-			{
-				return std::to_string(std::any_cast<int>(data));
-			}
-			if (data.type() == typeid(unsigned int))
-			{
-				return std::to_string(std::any_cast<unsigned int>(data));
-			}
-			if (data.type() == typeid(float))
-			{
-				return std::to_string(std::any_cast<float>(data));
-			}
-			if (data.type() == typeid(double))
-			{
-				return floatingNumToString(std::any_cast<double>(data));
-			}
-			if (data.type() == typeid(std::wstring))
-			{
-				std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-				std::string utf8String = converter.to_bytes(std::any_cast<std::wstring>(data));
-				return utf8String;
-			}
-			if (data.type() == typeid(wchar_t*))
-			{
-				std::wstring wStr = std::any_cast<wchar_t*>(data);
-				std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-				std::string utf8String = converter.to_bytes(wStr);
-				return utf8String;
-			}
-			if (data.type() == typeid(const wchar_t*))
-			{
-				std::wstring wStr = std::any_cast<const wchar_t*>(data);
-				std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-				std::string utf8String = converter.to_bytes(wStr);
-				return utf8String;
-			}
-			if (data.type() == typeid(size_t))
-			{
-				return std::to_string(std::any_cast<size_t>(data));
-			}
-			if (data.type() == typeid(bool))
-			{
-				if (std::any_cast<bool>(data)) return "true";
-				return "false";
-			}
-			if (data.type() == typeid(uint64_t))
-			{
-				return std::to_string(std::any_cast<uint64_t>(data));
-			}
-			if (data.type() == typeid(QString))
-			{
-				return std::any_cast<QString>(data).toStdString();
-			}
-			if (data.type() == typeid(QColor))
-			{
-				QColor color = std::any_cast<QColor>(data);
-				return QString("rgba(%1, %2, %3,%4)")
-						.arg(color.red())
-						.arg(color.green())
-						.arg(color.blue())
-						.arg(color.alpha())
-						.toStdString();
-				;
-			}
-			if (data.type() == typeid(QStringList))
-			{
-				auto strList = std::any_cast<QStringList>(data).toStdList();
-				if (strList.empty())
-				{
-					return {};
-				}
-
-				std::string str = "(";
-				for (QString i: strList)
-				{
-					str += "\"" + i.toStdString() + "\",";
-				}
-				str.replace(str.end() - 1, str.end(), "");
-				str += ")";
-				return str;
-			}
-			MZ_LOG_WARN("anythingToString 类型转换失败");// 如果不为空且没有匹配上类型
-			return {};
-		}
-		MZ_LOG_WARN("anythingToString 入参为空");
-		return {};
-	}
-}// namespace
 
 // -------------------------日志输出通道的类型-------------------------------------
 // ============================================================================
@@ -235,8 +71,8 @@ const std::string SINK_TYPE_NULL = "null";// 黑洞 sink，丢弃日志
 // ============================================================================
 // 4. 自定义sink
 // ============================================================================
-const std::string SINK_TYPE_COUNT_ROTATING_FILE_MT = "count_rotating_file_mt";                  // 按照日志条数进行滚动的日志sink // 目前启用----------------
-const std::string SINK_TYPE_DAILY_DIR_SIZE_ROTATING_FILE_MT = "daily_dir_size_rotating_file_mt";// 按照日志条数进行滚动的日期日志sink // 目前启用----------------
+const std::string SINK_TYPE_COUNT_ROTATING_FILE_MT = "count_rotating_file_mt";          // 按照日志条数进行滚动的日志sink // 目前启用----------------
+const std::string SINK_TYPE_DAILY_SIZE_ROTATING_FILE_MT = "daily_size_rotating_file_mt";// 按照日志条数进行滚动的日期日志sink // 目前启用----------------
 // ------------------------------------------------------------------------------
 
 LogPrivate* LogPrivate::s_instance = nullptr;
@@ -325,7 +161,7 @@ void LogPrivate::trace(const char* fileName, int fileLine, const char* function,
 {
 	std::string msg;
 	msg.clear();
-	msg = linkString(msgList);
+	msg = linkString(fileName, fileLine, function, msgList);
 	if (msgList.size() == 1)
 	{
 		if (msg.empty())
@@ -351,7 +187,7 @@ void LogPrivate::debug(const char* fileName, int fileLine, const char* function,
 {
 	std::string msg;
 	msg.clear();
-	msg = linkString(msgList);
+	msg = linkString(fileName, fileLine, function, msgList);
 	if (msgList.size() == 1)
 	{
 		if (msg.empty())
@@ -377,7 +213,7 @@ void LogPrivate::info(const char* fileName, int fileLine, const char* function, 
 {
 	std::string msg;
 	msg.clear();
-	msg = linkString(msgList);
+	msg = linkString(fileName, fileLine, function, msgList);
 	if (msgList.size() == 1)
 	{
 		if (msg.empty())
@@ -404,7 +240,7 @@ void LogPrivate::warn(const char* fileName, int fileLine, const char* function, 
 {
 	std::string msg;
 	msg.clear();
-	msg = linkString(msgList);
+	msg = linkString(fileName, fileLine, function, msgList);
 	if (msgList.size() == 1)
 	{
 		if (msg.empty())
@@ -430,7 +266,7 @@ void LogPrivate::error(const char* fileName, int fileLine, const char* function,
 {
 	std::string msg;
 	msg.clear();
-	msg = linkString(msgList);
+	msg = linkString(fileName, fileLine, function, msgList);
 	if (msgList.size() == 1)
 	{
 		if (msg.empty())
@@ -456,7 +292,7 @@ void LogPrivate::critical(const char* fileName, int fileLine, const char* functi
 {
 	std::string msg;
 	msg.clear();
-	msg = linkString(msgList);
+	msg = linkString(fileName, fileLine, function, msgList);
 	if (msgList.size() == 1)
 	{
 		if (msg.empty())
@@ -727,7 +563,7 @@ void LogPrivate::loadConfigFile(const std::string& configFilePath)
 							std::cout << "[LogPrivate] file_path is empty, index: " + std::to_string(i);
 							continue;
 						}
-						int maxSize = mozi::YamlTool::getDef<int>(sinkNode, "max_size", 10485760);
+						int maxSize = mozi::YamlTool::getDef<int>(sinkNode, "max_size", 52428800);
 						int maxFiles = mozi::YamlTool::getDef<int>(sinkNode, "max_files", 10);
 						auto rotateOnOpen = mozi::YamlTool::getDef<bool>(sinkNode, "rotate_on_open", false);// 是否在 logger 初始化时就立刻进行一次滚动
 						auto fileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(filePath, maxSize, maxFiles, rotateOnOpen);
@@ -759,13 +595,13 @@ void LogPrivate::loadConfigFile(const std::string& configFilePath)
 						}
 						int maxCount = mozi::YamlTool::getDef<int>(sinkNode, "max_count", 100000);
 						int maxFiles = mozi::YamlTool::getDef<int>(sinkNode, "max_files", 10);
-						auto rotateOnOpen = mozi::YamlTool::getDef<bool>(sinkNode, "rotate_on_open", false);// 是否在 logger 初始化时就立刻进行一次滚动
+						auto rotateOnOpen = mozi::YamlTool::getDef<bool>(sinkNode, "rotate_on_open", false);          // 是否在 logger 初始化时就立刻进行一次滚动
 						bool strictCountOnOpen = mozi::YamlTool::getDef<bool>(sinkNode, "strict_count_on_open", true);// 追加写入的时候，是否先计算一下当前文件的行数，决定是否立即进行滚动
 						auto fileSink = std::make_shared<CustomSink::count_rotating_file_mt<std::mutex>>(filePath, maxCount, maxFiles, rotateOnOpen, strictCountOnOpen);
 						fileSink->set_level(sinkLevel);
 						sinks.push_back(fileSink);
 					}
-					else if (type == SINK_TYPE_DAILY_DIR_SIZE_ROTATING_FILE_MT)
+					else if (type == SINK_TYPE_DAILY_SIZE_ROTATING_FILE_MT)
 					{
 						auto rootDir = mozi::YamlTool::getDef<std::string>(sinkNode, "root_dir", "");
 						if (rootDir.empty())
@@ -773,11 +609,21 @@ void LogPrivate::loadConfigFile(const std::string& configFilePath)
 							std::cout << "[LogPrivate] file_path is empty, index: " + std::to_string(i);
 							continue;
 						}
-						auto stem = mozi::YamlTool::getDef<std::string>(sinkNode, "stem", "");
-						int maxSize = mozi::YamlTool::getDef<int>(sinkNode, "max_size", 100000);
+						auto name = mozi::YamlTool::getDef<std::string>(sinkNode, "name", "{date}");
+						auto dateNameFormat = mozi::YamlTool::getDef<std::string>(sinkNode, "date_name_format", "yyyy-MM-dd");
+						int rotationHour = mozi::YamlTool::getDef<int>(sinkNode, "rotation_hour", 0);
+						int rotationMin = mozi::YamlTool::getDef<int>(sinkNode, "rotation_min", 0);
+						int maxSize = mozi::YamlTool::getDef<int>(sinkNode, "max_size", 52428800);
 						int maxFiles = mozi::YamlTool::getDef<int>(sinkNode, "max_files", 10);
 						auto rotateOnOpen = mozi::YamlTool::getDef<bool>(sinkNode, "rotate_on_open", false);// 是否在 logger 初始化时就立刻进行一次滚动
-						auto fileSink = std::make_shared<CustomSink::daily_dir_size_rotating_file_mt<std::mutex>>(rootDir, stem, maxSize, maxFiles, rotateOnOpen);
+						auto fileSink = std::make_shared<CustomSink::daily_size_rotating_file_mt<std::mutex>>(rootDir,
+																											  name,
+																											  dateNameFormat,
+																											  rotationHour,
+																											  rotationMin,
+																											  maxSize,
+																											  maxFiles,
+																											  rotateOnOpen);
 						fileSink->set_level(sinkLevel);
 						sinks.push_back(fileSink);
 					}
@@ -841,44 +687,47 @@ void LogPrivate::loadDefaultConfig(const std::string& configFilePath)
 	std::string errorShowLine = "true";
 	std::string criticalShowLine = "true";
 
-	std::string stdoutColorSinkType = "stdout_color_sink_mt";
+	std::string stdoutColorSinkType = SINK_TYPE_STDOUT_COLOR_SINK_MT;
 	std::string stdoutColorSinkLevel = "trace";
 
-	std::string basicSinkType = "basic_file_sink_mt";
-	std::string basicSinkFilePath = "./logs/basic_file_sink_mt.log";
+	std::string basicSinkType = SINK_TYPE_BASIC_FILE_SINK_MT;
 	std::string basicSinkLevel = "trace";
+	std::string basicSinkFilePath = "./logs/basic_file_sink_mt.log";
 	std::string basicSinkTruncate = "false";
 
-	std::string rotatingSinkType = "rotating_file_mt";
-	std::string rotatingSinkFilePath = "./logs/rotating_file_mt.log";
+	std::string rotatingSinkType = SINK_TYPE_ROTATING_FILE_MT;
 	std::string rotatingSinkLevel = "trace";
-	std::string rotatingSinkMaxSize = "10485760";
+	std::string rotatingSinkFilePath = "./logs/rotating_file_mt.log";
+	std::string rotatingSinkMaxSize = "52428800";
 	std::string rotatingSinkMaxFiles = "5";
 	std::string rotatingSinkRotateOnOpen = "false";
 
-	std::string dailySinkType = "daily_file_mt";
-	std::string dailySinkFilePath = "./logs/daily_file_mt.log";
+	std::string dailySinkType = SINK_TYPE_DAILY_FILE_MT;
 	std::string dailySinkLevel = "trace";
+	std::string dailySinkFilePath = "./logs/daily_file_mt.log";
 	std::string dailySinkRotationHour = "0";
 	std::string dailySinkRotationMin = "0";
 	std::string dailySinkMaxDays = "7";
 	std::string dailySinkTruncate = "false";
 
-	std::string countRotatingSinkType = "count_rotating_file_mt";
-	std::string countRotatingSinkFilePath = "./logs/count_rotating_file_mt.log";
+	std::string countRotatingSinkType = SINK_TYPE_COUNT_ROTATING_FILE_MT;
 	std::string countRotatingSinkLevel = "trace";
+	std::string countRotatingSinkFilePath = "./logs/count_rotating_file_mt.log";
 	std::string countRotatingSinkMaxCount = "100000";
 	std::string countRotatingSinkMaxFiles = "5";
 	std::string countRotatingSinkRotateOnOpen = "false";
 	std::string countRotatingSinkStrictCountOnOpen = "true";
 
-	std::string dailyDirSizeRotatingSinkType = "daily_dir_size_rotating_file_mt";
-	std::string dailyDirSizeRotatingSinkRootDir = "./logs";
-	std::string dailyDirSizeRotatingSinkStem = "daily_dir_size_rotating_file_mt";
-	std::string dailyDirSizeRotatingSinkLevel = "trace";
-	std::string dailyDirSizeRotatingSinkMaxSize = "100000";
-	std::string dailyDirSizeRotatingSinkMaxFiles = "5";
-	std::string dailyDirSizeRotatingSinkRotateOnOpen = "false";
+	std::string dailySizeRotatingSinkType = SINK_TYPE_DAILY_SIZE_ROTATING_FILE_MT;
+	std::string dailySizeRotatingSinkLevel = "trace";
+	std::string dailySizeRotatingSinkRootDir = "./logs";
+	std::string dailySizeRotatingSinkName = "{date}";
+	std::string dailySizeRotatingSinkDateNameFormat = "yyyy-MM-dd";
+	std::string dailySizeRotatingSinkRotationHour = "0";
+	std::string dailySizeRotatingSinkRotationMin = "0";
+	std::string dailySizeRotatingSinkMaxSize = "52428800";
+	std::string dailySizeRotatingSinkMaxFiles = "5";
+	std::string dailySizeRotatingSinkRotateOnOpen = "false";
 
 	mozi::YamlNode rootNode;
 	mozi::YamlNode logConfigNode;
@@ -906,15 +755,15 @@ void LogPrivate::loadDefaultConfig(const std::string& configFilePath)
 
 	mozi::YamlNode basicNode;
 	mozi::YamlTool::setDef<std::string>(basicNode, "type", basicSinkType);
-	mozi::YamlTool::setDef<std::string>(basicNode, "file_path", basicSinkFilePath);
 	mozi::YamlTool::setDef<std::string>(basicNode, "level", basicSinkLevel);
+	mozi::YamlTool::setDef<std::string>(basicNode, "file_path", basicSinkFilePath);
 	mozi::YamlTool::setDef<std::string>(basicNode, "truncate", basicSinkTruncate);
 	mozi::YamlTool::pushBack(sinksNode, basicNode);
 
 	mozi::YamlNode rotatingNode;
 	mozi::YamlTool::setDef<std::string>(rotatingNode, "type", rotatingSinkType);
-	mozi::YamlTool::setDef<std::string>(rotatingNode, "file_path", rotatingSinkFilePath);
 	mozi::YamlTool::setDef<std::string>(rotatingNode, "level", rotatingSinkLevel);
+	mozi::YamlTool::setDef<std::string>(rotatingNode, "file_path", rotatingSinkFilePath);
 	mozi::YamlTool::setDef<std::string>(rotatingNode, "max_size", rotatingSinkMaxSize);
 	mozi::YamlTool::setDef<std::string>(rotatingNode, "max_files", rotatingSinkMaxFiles);
 	mozi::YamlTool::setDef<std::string>(rotatingNode, "rotate_on_open", rotatingSinkRotateOnOpen);
@@ -922,8 +771,8 @@ void LogPrivate::loadDefaultConfig(const std::string& configFilePath)
 
 	mozi::YamlNode dailyNode;
 	mozi::YamlTool::setDef<std::string>(dailyNode, "type", dailySinkType);
-	mozi::YamlTool::setDef<std::string>(dailyNode, "file_path", dailySinkFilePath);
 	mozi::YamlTool::setDef<std::string>(dailyNode, "level", dailySinkLevel);
+	mozi::YamlTool::setDef<std::string>(dailyNode, "file_path", dailySinkFilePath);
 	mozi::YamlTool::setDef<std::string>(dailyNode, "rotation_hour", dailySinkRotationHour);
 	mozi::YamlTool::setDef<std::string>(dailyNode, "rotation_min", dailySinkRotationMin);
 	mozi::YamlTool::setDef<std::string>(dailyNode, "max_days", dailySinkMaxDays);
@@ -932,23 +781,26 @@ void LogPrivate::loadDefaultConfig(const std::string& configFilePath)
 
 	mozi::YamlNode countRotatingNode;
 	mozi::YamlTool::setDef<std::string>(countRotatingNode, "type", countRotatingSinkType);
-	mozi::YamlTool::setDef<std::string>(countRotatingNode, "file_path", countRotatingSinkFilePath);
 	mozi::YamlTool::setDef<std::string>(countRotatingNode, "level", countRotatingSinkLevel);
+	mozi::YamlTool::setDef<std::string>(countRotatingNode, "file_path", countRotatingSinkFilePath);
 	mozi::YamlTool::setDef<std::string>(countRotatingNode, "max_count", countRotatingSinkMaxCount);
 	mozi::YamlTool::setDef<std::string>(countRotatingNode, "max_files", countRotatingSinkMaxFiles);
 	mozi::YamlTool::setDef<std::string>(countRotatingNode, "rotate_on_open", countRotatingSinkRotateOnOpen);
 	mozi::YamlTool::setDef<std::string>(countRotatingNode, "strict_count_on_open", countRotatingSinkStrictCountOnOpen);
 	mozi::YamlTool::pushBack(sinksNode, countRotatingNode);
 
-	mozi::YamlNode dailyDirSizeRotatingNode;
-	mozi::YamlTool::setDef<std::string>(dailyDirSizeRotatingNode, "type", dailyDirSizeRotatingSinkType);
-	mozi::YamlTool::setDef<std::string>(dailyDirSizeRotatingNode, "root_dir", dailyDirSizeRotatingSinkRootDir);
-	mozi::YamlTool::setDef<std::string>(dailyDirSizeRotatingNode, "stem", dailyDirSizeRotatingSinkStem);
-	mozi::YamlTool::setDef<std::string>(dailyDirSizeRotatingNode, "level", dailyDirSizeRotatingSinkLevel);
-	mozi::YamlTool::setDef<std::string>(dailyDirSizeRotatingNode, "max_size", dailyDirSizeRotatingSinkMaxSize);
-	mozi::YamlTool::setDef<std::string>(dailyDirSizeRotatingNode, "max_files", dailyDirSizeRotatingSinkMaxFiles);
-	mozi::YamlTool::setDef<std::string>(dailyDirSizeRotatingNode, "rotate_on_open", dailyDirSizeRotatingSinkRotateOnOpen);
-	mozi::YamlTool::pushBack(sinksNode, dailyDirSizeRotatingNode);
+	mozi::YamlNode dailySizeRotatingNode;
+	mozi::YamlTool::setDef<std::string>(dailySizeRotatingNode, "type", dailySizeRotatingSinkType);
+	mozi::YamlTool::setDef<std::string>(dailySizeRotatingNode, "level", dailySizeRotatingSinkLevel);
+	mozi::YamlTool::setDef<std::string>(dailySizeRotatingNode, "root_dir", dailySizeRotatingSinkRootDir);
+	mozi::YamlTool::setDef<std::string>(dailySizeRotatingNode, "name", dailySizeRotatingSinkName);
+	mozi::YamlTool::setDef<std::string>(dailySizeRotatingNode, "date_name_format", dailySizeRotatingSinkDateNameFormat);
+	mozi::YamlTool::setDef<std::string>(dailySizeRotatingNode, "rotation_hour", dailySizeRotatingSinkRotationHour);
+	mozi::YamlTool::setDef<std::string>(dailySizeRotatingNode, "rotation_min", dailySizeRotatingSinkRotationMin);
+	mozi::YamlTool::setDef<std::string>(dailySizeRotatingNode, "max_size", dailySizeRotatingSinkMaxSize);
+	mozi::YamlTool::setDef<std::string>(dailySizeRotatingNode, "max_files", dailySizeRotatingSinkMaxFiles);
+	mozi::YamlTool::setDef<std::string>(dailySizeRotatingNode, "rotate_on_open", dailySizeRotatingSinkRotateOnOpen);
+	mozi::YamlTool::pushBack(sinksNode, dailySizeRotatingNode);
 
 	mozi::YamlTool::addNode(logConfigNode, "logger", loggerNode);
 	mozi::YamlTool::addNode(logConfigNode, "showCodeLine", showCodeLineNode);
@@ -1013,7 +865,7 @@ bool LogPrivate::checkSinkFilePath(const std::string& sinkType, const std::strin
 }
 
 
-std::string LogPrivate::linkString(const std::initializer_list<std::any>& msgList)
+std::string LogPrivate::linkString(const char* fileName, int fileLine, const char* function, const std::initializer_list<std::any>& msgList)
 {
 	if (msgList.size() == 0)
 	{
@@ -1024,7 +876,7 @@ std::string LogPrivate::linkString(const std::initializer_list<std::any>& msgLis
 	linkStr.clear();
 	for (const auto& msg: msgList)
 	{
-		std::string msgStr = anyToString(msg);
+		std::string msgStr = anyToString(fileName, fileLine, function, msg);
 		// if (msgStr.empty())
 		// {
 		// 	return {};
@@ -1032,4 +884,173 @@ std::string LogPrivate::linkString(const std::initializer_list<std::any>& msgLis
 		linkStr += msgStr;
 	}
 	return linkStr;
+}
+std::string LogPrivate::floatingNumToString(double value)
+{
+	if (value == 0.0 || value == -0.0)
+	{
+		return "0";
+	}
+
+	std::ostringstream out;
+	int prec = std::numeric_limits<double>::digits10;
+	std::string res;
+	double tmp = value;
+	while (prec >= 7)
+	{
+		out.clear();
+		out.str(std::string());
+		out.precision(prec);//覆盖默认精度
+		out << tmp;
+		std::string str = out.str();//从流中取出字符串
+		res = str;
+		tmp = std::stod(str);
+		prec -= 1;
+	}
+
+	std::replace(res.begin(), res.end(), 'e', 'E');
+	return res;
+}
+std::string LogPrivate::anyToString(const char* fileName, int fileLine, const char* function, const std::any& data)
+{
+
+	if (!data.has_value())
+	{
+		return {};
+	}
+	if (data.type() != typeid(nullptr))
+	{
+		if (data.type() == typeid(std::string))
+		{
+			return std::any_cast<std::string>(data);
+		}
+		if (data.type() == typeid(std::string&))
+		{
+			return std::any_cast<std::string>(data);
+		}
+		if (data.type() == typeid(const std::string&))
+		{
+			return std::any_cast<std::string>(data);
+		}
+		if (data.type() == typeid(const char*))// 添加对 const char* 的支持
+		{
+			return std::any_cast<const char*>(data);// 直接返回字符串
+		}
+		if (data.type() == typeid(long))// 添加对 const char* 的支持
+		{
+			return std::to_string(std::any_cast<long>(data));
+		}
+		if (data.type() == typeid(long long))// 添加对 const char* 的支持
+		{
+			return std::to_string(std::any_cast<long long>(data));
+		}
+		if (data.type() == typeid(char*))
+		{
+			return std::any_cast<char*>(data);
+		}
+		if (data.type() == typeid(int))
+		{
+			return std::to_string(std::any_cast<int>(data));
+		}
+		if (data.type() == typeid(unsigned int))
+		{
+			return std::to_string(std::any_cast<unsigned int>(data));
+		}
+		if (data.type() == typeid(float))
+		{
+			return std::to_string(std::any_cast<float>(data));
+		}
+		if (data.type() == typeid(double))
+		{
+			return floatingNumToString(std::any_cast<double>(data));
+		}
+		if (data.type() == typeid(std::wstring))
+		{
+			std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+			std::string utf8String = converter.to_bytes(std::any_cast<std::wstring>(data));
+			return utf8String;
+		}
+		if (data.type() == typeid(wchar_t*))
+		{
+			std::wstring wStr = std::any_cast<wchar_t*>(data);
+			std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+			std::string utf8String = converter.to_bytes(wStr);
+			return utf8String;
+		}
+		if (data.type() == typeid(const wchar_t*))
+		{
+			std::wstring wStr = std::any_cast<const wchar_t*>(data);
+			std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+			std::string utf8String = converter.to_bytes(wStr);
+			return utf8String;
+		}
+		if (data.type() == typeid(size_t))
+		{
+			return std::to_string(std::any_cast<size_t>(data));
+		}
+		if (data.type() == typeid(bool))
+		{
+			if (std::any_cast<bool>(data)) return "true";
+			return "false";
+		}
+		if (data.type() == typeid(uint64_t))
+		{
+			return std::to_string(std::any_cast<uint64_t>(data));
+		}
+		if (data.type() == typeid(QString))
+		{
+			return std::any_cast<QString>(data).toStdString();
+		}
+		if (data.type() == typeid(QColor))
+		{
+			QColor color = std::any_cast<QColor>(data);
+			return QString("rgba(%1, %2, %3,%4)")
+					.arg(color.red())
+					.arg(color.green())
+					.arg(color.blue())
+					.arg(color.alpha())
+					.toStdString();
+			;
+		}
+		if (data.type() == typeid(QStringList))
+		{
+			auto strList = std::any_cast<QStringList>(data).toStdList();
+			if (strList.empty())
+			{
+				return {};
+			}
+
+			std::string str = "(";
+			for (QString i: strList)
+			{
+				str += "\"" + i.toStdString() + "\",";
+			}
+			str.replace(str.end() - 1, str.end(), "");
+			str += ")";
+			return str;
+		}
+		if (data.type() == typeid(QByteArray))
+		{
+			return std::any_cast<QByteArray>(data).toStdString();
+		}
+		if (data.type() == typeid(qint64))
+		{
+			return std::to_string(std::any_cast<qint64>(data));
+		}
+		if (data.type() == typeid(QPoint))
+		{
+			std::string str = "(" + std::to_string(std::any_cast<QPoint>(data).x()) + "," + std::to_string(std::any_cast<QPoint>(data).y()) + ")";
+			return str;
+		}
+		if (data.type() == typeid(QPointF))
+		{
+			std::string str = "(" + floatingNumToString(std::any_cast<QPointF>(data).x()) + "," + floatingNumToString(std::any_cast<QPointF>(data).y()) + ")";
+			return str;
+		}
+
+		getInstance()->getLogger()->warn("[{}:{}][{}] anythingToString 类型转换失败", fileName, fileLine, function);// 如果不为空且没有匹配上类型
+		return {};
+	}
+	getInstance()->getLogger()->warn("[{}:{}][{}] anythingToString 入参为空", fileName, fileLine, function);// 如果不为空且没有匹配上类型
+	return {};
 }

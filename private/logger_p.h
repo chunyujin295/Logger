@@ -41,7 +41,7 @@ public:
 	 * @param configFilePath 配置文件路径
 	 * @param isDeleteOldConfig 是否删除旧的配置文件
 	 */
-	static void setConfigPath(const std::string& configFilePath, bool isDeleteOldConfig =  true);
+	static void setConfigPath(const std::string& configFilePath, bool isDeleteOldConfig = true);
 
 	/**
      * 输出带行号的trace级别日志文本，严重级别0
@@ -121,7 +121,7 @@ public:
 	 * @param level 日志级别
 	 * @return 回调日志id
 	 */
-	static std::string addCallBackSink( const std::function<void(const LogMsg& logMsg)>& logCallBack, LogLevel level = LogLevel::Trace);
+	static std::string addCallBackSink(const std::function<void(const LogMsg& logMsg)>& logCallBack, LogLevel level = LogLevel::Trace);
 
 	/**
 	 * 删除日志回调函数
@@ -187,10 +187,30 @@ private:
 
 	/**
 	 * 用于拼接字符串
+	 * @param fileName
+	 * @param fileLine
+	 * @param function
 	 * @param msgList
 	 * @return
 	 */
-	static std::string linkString(const std::initializer_list<std::any>& msgList);
+	static std::string linkString(const char* fileName, int fileLine, const char* function, const std::initializer_list<std::any>& msgList);
+
+	/**
+	 * 浮点数转字符串,保留7位有效数字
+	 * @param value
+	 * @return
+	 */
+	static std::string floatingNumToString(double value);
+
+	/**
+	 * std::any数据转string
+	 * @param fileName
+	 * @param fileLine
+	 * @param function
+	 * @param data
+	 * @return
+	 */
+	static std::string anyToString(const char* fileName, int fileLine, const char* function, const std::any& data);
 
 private:
 	// 静态互斥锁，用于确保线程安全
