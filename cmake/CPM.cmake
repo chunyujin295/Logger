@@ -16,9 +16,16 @@ endif()
 # Expand relative path. This is important if the provided path contains a tilde (~)
 get_filename_component(CPM_DOWNLOAD_LOCATION ${CPM_DOWNLOAD_LOCATION} ABSOLUTE)
 
-file(DOWNLOAD
-     https://github.com/cpm-cmake/CPM.cmake/releases/download/v${CPM_DOWNLOAD_VERSION}/CPM.cmake
-     ${CPM_DOWNLOAD_LOCATION} EXPECTED_HASH SHA256=${CPM_HASH_SUM}
-)
+set(_CPM_VENDOR_LOCATION "${CMAKE_CURRENT_LIST_DIR}/vendor/CPM.cmake")
+if(EXISTS "${_CPM_VENDOR_LOCATION}")
+  include("${_CPM_VENDOR_LOCATION}")
+  return()
+endif()
+
+message(FATAL_ERROR
+        "Vendored CPM.cmake not found at: ${_CPM_VENDOR_LOCATION}\n"
+        "Please add it to the repo (recommended), or restore the download logic.")
+
+
 
 include(${CPM_DOWNLOAD_LOCATION})
