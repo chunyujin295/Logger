@@ -2,7 +2,7 @@
 # 设置导出静态库，这样install脚本中不需要顺带发布
 set(SPDLOG_BUILD_SHARED ON CACHE BOOL "spdlog Build Shared Lib" FORCE) # 覆盖spdlog的Option，生成静态库
 
-add_subdirectory(${CMAKE_SOURCE_DIR}/3rd/spdlog-1.16.0)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/3rd/spdlog-1.16.0)
 
 set_target_properties(spdlog
         PROPERTIES
