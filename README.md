@@ -1,4 +1,4 @@
-<div><center><img src="./doc/img/LOGO_CUTED.png" alt="LOGO_CUTED" style="zoom:20%;" /></center></div>
+<div><center><img src="./doc/img/LOGO_CUTED.png" alt="LOGO_CUTED" style="zoom:100%;" /></center></div>
 这是一个基于spdlog的日志库，支持通过yaml配置文件进行日志sink输出配置
 # 日志使用文档
 
