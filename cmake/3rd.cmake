@@ -19,5 +19,5 @@ set(YAML_TOOL_INSTALL OFF CACHE BOOL "yaml-tool install" FORCE)
 CPMAddPackage(
         NAME yaml-tool
         GIT_REPOSITORY git@github.com:chunyujin295/yaml-tool.git
-        GIT_TAG v1.0.5
+        GIT_TAG v1.1.0
 )
