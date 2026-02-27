@@ -1,3 +1,4 @@
+<div><center><img src="./doc/img/LOGO_CUTED.png" alt="LOGO_CUTED" style="zoom:20%;" /></center></div>
 这是一个基于spdlog的日志库，支持通过yaml配置文件进行日志sink输出配置
 # 日志使用文档
 
@@ -19,13 +20,13 @@ std::vector<int> testFunction()
     Logger::setConfigPath("./myLogConfig.yml");// 可选，手动修改日志配置位置
     // 否则默认读取可执行文件所在路径下默认配置，配置不存在，自动生成
     
-	MZ_LOG_INFO("testFunction started!");// 打印程序启动信息日志
+	LOG_INFO("testFunction started!");// 打印程序启动信息日志
 
 	std::vector<int> vec(5);
 	for (int i = 0; i < vec.size(); ++i)
 	{
 		vec.at(i) = i * i;
-		MZ_LOG_DEBUG("myFunction: std::vector<int> vec(" , i, ") = ", i*i);
+		LOG_DEBUG("myFunction: std::vector<int> vec(" , i, ") = ", i*i);
 	}
 	try
 	{
@@ -33,7 +34,7 @@ std::vector<int> testFunction()
 	}
 	catch (const std::out_of_range& e)
 	{
-		MZ_LOG_ERROR(e.what());// 输出越界信息 
+		LOG_ERROR(e.what());// 输出越界信息 
 		//处理异常
 	}
 }
