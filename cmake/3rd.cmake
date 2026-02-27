@@ -18,6 +18,6 @@ set(YAML_TOOL_BUILD_SHARED_LIBS ON CACHE BOOL "yaml-tool Build Shared Lib" FORCE
 set(YAML_TOOL_INSTALL OFF CACHE BOOL "yaml-tool install" FORCE)
 CPMAddPackage(
         NAME yaml-tool
-        GIT_REPOSITORY https://github.com/chunyujin295/yaml-tool.git
+        GIT_REPOSITORY git@github.com:chunyujin295/yaml-tool.git
         GIT_TAG v1.0.5
 )
