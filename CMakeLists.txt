@@ -2,6 +2,14 @@ cmake_minimum_required(VERSION 3.21)
 project(Logger_LIB)
 set(CMAKE_CXX_STANDARD 17)
 
+# 在 project(Logger_LIB) 之后添加：
+if (CMAKE_COMPILER_IS_GNUCXX OR MINGW)
+    # 静态链接 GCC 运行时（包括 libgcc, libstdc++, pthread）
+    # 防止MinGW下依赖运行时库，导致依赖不明确，ABI异常
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -static")
+endif()
+
 include(cmake/3rd.cmake)
 include(cmake/option.cmake)
 
