@@ -29,7 +29,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE private)
 
 # 链接第三方库
 # 这里用PRIVATE明确私有化
-target_link_libraries(${PROJECT_NAME} PRIVATE spdlog::spdlog_header_only)# 这里引用header-only，否则后面MinGW提示缺少libstbC++-6.dll等ABI不兼容问题
+target_link_libraries(${PROJECT_NAME} PRIVATE spdlog::spdlog_header_only)# 这里可以引用header-only，不过静态链接spdlog的话，无所谓
 target_link_libraries(${PROJECT_NAME} PRIVATE yaml-tool)
 
 #set_target_properties(${PROJECT_NAME}
@@ -39,3 +39,13 @@ target_link_libraries(${PROJECT_NAME} PRIVATE yaml-tool)
 #        ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 #)
 
+
+#if (MINGW)
+#    target_link_options(${PROJECT_NAME} PRIVATE
+#            -static-libgcc
+#            -static-libstdc++
+#            -Wl,-Bstatic
+#            -lwinpthread
+#            -Wl,-Bdynamic
+#    )
+#endif()
