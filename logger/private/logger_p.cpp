@@ -15,7 +15,6 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 // #include <QString>
-#include <codecvt>
 #include <cstdarg>
 #include <cwctype>
 #include <filesystem>
@@ -79,8 +78,7 @@ const std::string SINK_TYPE_DAILY_SIZE_ROTATING_FILE_MT = "daily_size_rotating_f
 // 按照日志条数进行滚动的日期日志sink // 目前启用----------------
 // ------------------------------------------------------------------------------
 
-LogPrivate* LogPrivate::s_instance = nullptr;
-std::mutex LogPrivate::s_mutex;
+// Meyer's Singleton — C++11 保证线程安全
 
 std::string LogPrivate::m_configFilePath = "./log_config.yaml";
 bool LogPrivate::m_traceShowLine = false;
@@ -142,183 +140,81 @@ void LogPrivate::setConfigPath(const std::string& configFilePath, bool isDeleteO
     std::string oldConfigPath = m_configFilePath;
     try
     {
-        getInstance()->loadConfigFile(configFilePath);
-        if (getInstance()->getLogger()->level() == spdlog::level::off) // 日志级别设置失败，为off
+        getInstance().loadConfigFile(configFilePath);
+        if (getInstance().getLogger()->level() == spdlog::level::off) // 日志级别设置失败，为off
         {
             std::cout << "[LogPrivate] 日志级别为off" << std::endl;
         }
     } catch (const spdlog::spdlog_ex& ex) // 捕获读取配置文件过程中遇到的异常
     {
         std::cout << "[LogPrivate] Log initialization error: " << ex.what() << std::endl;
-        getInstance()->loadDefaultConfig(configFilePath); // 采用默认配置
+        getInstance().loadDefaultConfig(configFilePath); // 采用默认配置
     }
     if (isDeleteOldConfig)
     {
-        getInstance()->deleteOldConfig(oldConfigPath);
+        getInstance().deleteOldConfig(oldConfigPath);
     }
 }
 
 void LogPrivate::trace(const char* fileName, int fileLine, const char* function,
                        const std::initializer_list<std::any>& msgList)
 {
-    std::string msg;
-    msg.clear();
-    msg = linkString(fileName, fileLine, function, msgList);
-    if (msgList.size() == 1)
-    {
-        if (msg.empty())
-        {
-            getInstance()->getLogger()->trace("[{}:{}][{}] 日志内容为空", fileName, fileLine, function);
-            return;
-        }
-    }
-    else if (msg.empty())
-    {
-        getInstance()->getLogger()->trace("[{}:{}][{}] 日志打印失败，数据类型转换错误", fileName, fileLine, function);
-        return;
-    }
-    if (!m_traceShowLine)
-    {
-        getInstance()->getLogger()->trace("{}", msg);
-        return;
-    }
-    getInstance()->getLogger()->trace("[{}:{}][{}]{}", fileName, fileLine, function, msg);
+    logImpl(fileName, fileLine, function, msgList, m_traceShowLine, spdlog::level::trace);
 }
 
 void LogPrivate::debug(const char* fileName, int fileLine, const char* function,
                        const std::initializer_list<std::any>& msgList)
 {
-    std::string msg;
-    msg.clear();
-    msg = linkString(fileName, fileLine, function, msgList);
-    if (msgList.size() == 1)
-    {
-        if (msg.empty())
-        {
-            getInstance()->getLogger()->debug("[{}:{}][{}] 日志内容为空", fileName, fileLine, function);
-            return;
-        }
-    }
-    else if (msg.empty())
-    {
-        getInstance()->getLogger()->debug("[{}:{}][{}] 日志打印失败，数据类型转换错误", fileName, fileLine, function);
-        return;
-    }
-    if (!m_debugShowLine)
-    {
-        getInstance()->getLogger()->debug("{}", msg);
-        return;
-    }
-    getInstance()->getLogger()->debug("[{}:{}][{}]{}", fileName, fileLine, function, msg);
+    logImpl(fileName, fileLine, function, msgList, m_debugShowLine, spdlog::level::debug);
 }
 
 void LogPrivate::info(const char* fileName, int fileLine, const char* function,
                       const std::initializer_list<std::any>& msgList)
 {
-    std::string msg;
-    msg.clear();
-    msg = linkString(fileName, fileLine, function, msgList);
-    if (msgList.size() == 1)
-    {
-        if (msg.empty())
-        {
-            getInstance()->getLogger()->info("[{}:{}][{}] 日志内容为空", fileName, fileLine, function);
-            return;
-        }
-    }
-    else if (msg.empty())
-    {
-        getInstance()->getLogger()->info("[{}:{}][{}] 日志打印失败，数据类型转换错误", fileName, fileLine, function);
-        return;
-    }
-
-    if (!m_infoShowLine)
-    {
-        getInstance()->getLogger()->info("{}", msg);
-        return;
-    }
-    getInstance()->getLogger()->info("[{}:{}][{}]{}", fileName, fileLine, function, msg);
+    logImpl(fileName, fileLine, function, msgList, m_infoShowLine, spdlog::level::info);
 }
 
 void LogPrivate::warn(const char* fileName, int fileLine, const char* function,
                       const std::initializer_list<std::any>& msgList)
 {
-    std::string msg;
-    msg.clear();
-    msg = linkString(fileName, fileLine, function, msgList);
-    if (msgList.size() == 1)
-    {
-        if (msg.empty())
-        {
-            getInstance()->getLogger()->warn("[{}:{}][{}] 日志内容为空", fileName, fileLine, function);
-            return;
-        }
-    }
-    else if (msg.empty())
-    {
-        getInstance()->getLogger()->warn("[{}:{}][{}] 日志打印失败，数据类型转换错误", fileName, fileLine, function);
-        return;
-    }
-    if (!m_warnShowLine)
-    {
-        getInstance()->getLogger()->warn("{}", msg);
-        return;
-    }
-    getInstance()->getLogger()->warn("[{}:{}][{}]{}", fileName, fileLine, function, msg);
+    logImpl(fileName, fileLine, function, msgList, m_warnShowLine, spdlog::level::warn);
 }
 
 void LogPrivate::error(const char* fileName, int fileLine, const char* function,
                        const std::initializer_list<std::any>& msgList)
 {
-    std::string msg;
-    msg.clear();
-    msg = linkString(fileName, fileLine, function, msgList);
-    if (msgList.size() == 1)
-    {
-        if (msg.empty())
-        {
-            getInstance()->getLogger()->error("[{}:{}][{}] 日志内容为空", fileName, fileLine, function);
-            return;
-        }
-    }
-    else if (msg.empty())
-    {
-        getInstance()->getLogger()->error("[{}:{}][{}] 日志打印失败，数据类型转换错误", fileName, fileLine, function);
-        return;
-    }
-    if (!m_errorShowLine)
-    {
-        getInstance()->getLogger()->error("{}", msg);
-        return;
-    }
-    getInstance()->getLogger()->error("[{}:{}][{}]{}", fileName, fileLine, function, msg);
+    logImpl(fileName, fileLine, function, msgList, m_errorShowLine, spdlog::level::err);
 }
 
 void LogPrivate::critical(const char* fileName, int fileLine, const char* function,
                           const std::initializer_list<std::any>& msgList)
 {
-    std::string msg;
-    msg.clear();
-    msg = linkString(fileName, fileLine, function, msgList);
-    if (msgList.size() == 1)
+    logImpl(fileName, fileLine, function, msgList, m_criticalShowLine, spdlog::level::critical);
+}
+
+void LogPrivate::logImpl(const char* fileName, int fileLine, const char* function,
+                         const std::initializer_list<std::any>& msgList,
+                         bool showLine, spdlog::level::level_enum level)
+{
+    std::string msg = linkString(fileName, fileLine, function, msgList);
+    auto logger = getInstance().getLogger();
+
+    if (msgList.size() == 1 && msg.empty())
     {
-        if (msg.empty())
-        {
-            getInstance()->getLogger()->critical("[{}:{}][{}] 日志内容为空", fileName, fileLine, function);
-            return;
-        }
-    }
-    else if (msg.empty())
-    {
-        getInstance()->getLogger()->critical("[{}:{}][{}] 日志打印失败，数据类型转换错误", fileName, fileLine, function);
+        logger->log(level, "[{}:{}][{}] 日志内容为空", fileName, fileLine, function);
         return;
     }
-    if (!m_criticalShowLine)
+    if (msgList.size() > 1 && msg.empty())
     {
-        getInstance()->getLogger()->critical("{}", msg);
+        logger->log(level, "[{}:{}][{}] 日志打印失败，数据类型转换错误", fileName, fileLine, function);
         return;
     }
-    getInstance()->getLogger()->critical("[{}:{}][{}]{}", fileName, fileLine, function, msg);
+    if (!showLine)
+    {
+        logger->log(level, "{}", msg);
+        return;
+    }
+    logger->log(level, "[{}:{}][{}]{}", fileName, fileLine, function, msg);
 }
 
 void LogPrivate::setStreamOutPut(std::ostringstream& stream, bool flush, LogLevel level)
@@ -345,18 +241,18 @@ void LogPrivate::setStreamOutPut(std::ostringstream& stream, bool flush, LogLeve
         case LogLevel::Critical:
             spdlogLevel = spdlog::level::critical;
             break;
-        defalut:
+        default:
             break;
     }
 
     streamSink->set_level(spdlogLevel);
-    getInstance()->getLogger()->sinks().push_back(streamSink);
+    getInstance().getLogger()->sinks().push_back(streamSink);
 }
 
 
 std::string LogPrivate::addCallBackSink(const std::function<void(const LogMsg& logMsg)>& logCallBack, LogLevel level)
 {
-    auto logger = getInstance()->getLogger();
+    auto logger = getInstance().getLogger();
     if (!logger)
         return {};
 
@@ -387,7 +283,7 @@ std::string LogPrivate::addCallBackSink(const std::function<void(const LogMsg& l
 
 void LogPrivate::removeCallBackSink(const std::string& sinkId)
 {
-    auto logger = getInstance()->getLogger();
+    auto logger = getInstance().getLogger();
     if (!logger)
         return;
 
@@ -429,20 +325,10 @@ LogPrivate::LogPrivate()
     }
 }
 
-LogPrivate* LogPrivate::getInstance()
+LogPrivate& LogPrivate::getInstance()
 {
-    // DCL双检锁创建单例
-    if (s_instance == nullptr)
-    {
-        std::lock_guard<std::mutex> lock(s_mutex); // 确保多线程创建单例时线程安全
-        if (s_instance == nullptr)
-        {
-            s_instance = new LogPrivate();
-        }
-    }
-    // 初始化异步线程池
-    // spdlog::init_thread_pool(8192, 1);
-    return s_instance;
+    static LogPrivate instance;
+    return instance;
 }
 
 std::shared_ptr<spdlog::logger> LogPrivate::getLogger()
@@ -913,13 +799,13 @@ std::string LogPrivate::anyToString(const char* fileName, int fileLine, const ch
 {
     if (!data.has_value())
     {
-        getInstance()->getLogger()->debug("[{}:{}][{}] anyToString: empty std::any", fileName, fileLine, function);
+        getInstance().getLogger()->debug("[{}:{}][{}] anyToString: empty std::any", fileName, fileLine, function);
         return {};
     }
 
     if (data.type() == typeid(std::nullptr_t))
     {
-        getInstance()->getLogger()->warn("[{}:{}][{}] anyToString: std::any holds nullptr_t (prefer empty std::any)",
+        getInstance().getLogger()->warn("[{}:{}][{}] anyToString: std::any holds nullptr_t (prefer empty std::any)",
                                          fileName, fileLine, function);
         return {};
     }
@@ -928,7 +814,7 @@ std::string LogPrivate::anyToString(const char* fileName, int fileLine, const ch
     if (!res.has_value())
     {
         // 建议 debug 或做采样/去重
-        getInstance()->getLogger()->debug("[{}:{}][{}] anyToString: convert failed, type={}", fileName, fileLine,
+        getInstance().getLogger()->debug("[{}:{}][{}] anyToString: convert failed, type={}", fileName, fileLine,
                                           function, data.type().name());
         return {};
         // 或 return "<convert-failed>";

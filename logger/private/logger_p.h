@@ -11,7 +11,6 @@
 #include "id8generator.hpp"
 #include <logger/logger.h>
 #include <memory>
-#include <mutex>
 #include <spdlog/spdlog.h>
 
 class LogPrivate
@@ -144,7 +143,7 @@ private:
      * 进行初始化
      * @return
      */
-	static LogPrivate* getInstance();
+	static LogPrivate& getInstance();
 
 	/**
      * 获取内部日志对象spdlog指针
@@ -186,12 +185,14 @@ private:
 	bool checkSinkFilePath(const std::string& sinkType, const std::string& filePath);
 
 	/**
+	 * 日志输出公共实现
+	 */
+	static void logImpl(const char* fileName, int fileLine, const char* function,
+						const std::initializer_list<std::any>& msgList,
+						bool showLine, spdlog::level::level_enum level);
+
+	/**
 	 * 用于拼接字符串
-	 * @param fileName
-	 * @param fileLine
-	 * @param function
-	 * @param msgList
-	 * @return
 	 */
 	static std::string linkString(const char* fileName, int fileLine, const char* function, const std::initializer_list<std::any>& msgList);
 
@@ -213,10 +214,6 @@ private:
 	static std::string anyToString(const char* fileName, int fileLine, const char* function, const std::any& data);
 
 private:
-	// 静态互斥锁，用于确保线程安全
-	static std::mutex s_mutex;
-	// 静态对象指针
-	static LogPrivate* s_instance;
 	// spdlog库logger类对象指针
 	std::shared_ptr<spdlog::logger> m_logger;
 

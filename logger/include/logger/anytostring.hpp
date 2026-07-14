@@ -4,182 +4,114 @@
   * File：anytostring.h
   * Author：3029795434@qq.com
   * Date：2026/2/11
-  * Update：
+  * Update：2026/7/13 — 优化类型分发 O(1)，替换废弃 codecvt
   * ************************************************/
 #ifndef LOGGER_ANYTOSTRING_H
 #define LOGGER_ANYTOSTRING_H
 #include <any>
-#include <codecvt>
+#include <charconv>
+#include <functional>
 #include <optional>
 #include <string>
+#include <typeindex>
+#include <unordered_map>
+
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <codecvt>
+#include <locale>
+#endif
 
 namespace LoggerUtil
 {
     inline std::string floatingNumToString(double value)
     {
         if (value == 0.0 || value == -0.0)
-        {
             return "0";
-        }
 
-        std::ostringstream out;
-        int prec = std::numeric_limits<double>::digits10;
-        std::string res;
-        double tmp = value;
-        while (prec >= 7)
-        {
-            out.clear();
-            out.str(std::string());
-            out.precision(prec); //覆盖默认精度
-            out << tmp;
-            std::string str = out.str(); //从流中取出字符串
-            res = str;
-            tmp = std::stod(str);
-            prec -= 1;
-        }
-
-        std::replace(res.begin(), res.end(), 'e', 'E');
-        return res;
+        char buf[32];
+        auto [ptr, ec] = std::to_chars(buf, buf + sizeof(buf), value);
+        if (ec != std::errc{})
+            return std::to_string(value);  // fallback
+        return std::string(buf, ptr);
     }
 
-    inline std::optional<std::string> anyToString(const char* fileName, int fileLine, const char* function,
-                                                  const std::any& data)
+    /// 宽字符转 UTF-8（不使用已废弃的 std::codecvt）
+    inline std::string wstringToUtf8(std::wstring_view wstr)
+    {
+        if (wstr.empty()) return {};
+#ifdef _WIN32
+        int len = WideCharToMultiByte(CP_UTF8, 0, wstr.data(), static_cast<int>(wstr.size()),
+                                      nullptr, 0, nullptr, nullptr);
+        if (len <= 0) return {};
+        std::string result(static_cast<size_t>(len), '\0');
+        WideCharToMultiByte(CP_UTF8, 0, wstr.data(), static_cast<int>(wstr.size()),
+                            result.data(), len, nullptr, nullptr);
+        return result;
+#else
+        // POSIX：C++17 标记废弃但 C++26 前仍可用
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+        std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+        auto result = converter.to_bytes(wstr.data());
+        #pragma GCC diagnostic pop
+        return result;
+#endif
+    }
+
+    /// O(1) 类型分发表（静态初始化一次）
+    using AnyConverter = std::function<std::optional<std::string>(const std::any&)>;
+
+    inline const std::unordered_map<std::type_index, AnyConverter>& getConverters()
+    {
+        static const std::unordered_map<std::type_index, AnyConverter> map = {
+            {std::type_index(typeid(std::string)),
+             [](const std::any& a) -> std::optional<std::string> { return std::any_cast<std::string>(a); }},
+            {std::type_index(typeid(const char*)),
+             [](const std::any& a) -> std::optional<std::string> { return std::any_cast<const char*>(a); }},
+            {std::type_index(typeid(char*)),
+             [](const std::any& a) -> std::optional<std::string> { return std::any_cast<char*>(a); }},
+            {std::type_index(typeid(int)),
+             [](const std::any& a) -> std::optional<std::string> { return std::to_string(std::any_cast<int>(a)); }},
+            {std::type_index(typeid(unsigned int)),
+             [](const std::any& a) -> std::optional<std::string> { return std::to_string(std::any_cast<unsigned int>(a)); }},
+            {std::type_index(typeid(long)),
+             [](const std::any& a) -> std::optional<std::string> { return std::to_string(std::any_cast<long>(a)); }},
+            {std::type_index(typeid(long long)),
+             [](const std::any& a) -> std::optional<std::string> { return std::to_string(std::any_cast<long long>(a)); }},
+            {std::type_index(typeid(float)),
+             [](const std::any& a) -> std::optional<std::string> { return std::to_string(std::any_cast<float>(a)); }},
+            {std::type_index(typeid(double)),
+             [](const std::any& a) -> std::optional<std::string> { return floatingNumToString(std::any_cast<double>(a)); }},
+            {std::type_index(typeid(size_t)),
+             [](const std::any& a) -> std::optional<std::string> { return std::to_string(std::any_cast<size_t>(a)); }},
+            {std::type_index(typeid(uint64_t)),
+             [](const std::any& a) -> std::optional<std::string> { return std::to_string(std::any_cast<uint64_t>(a)); }},
+            {std::type_index(typeid(bool)),
+             [](const std::any& a) -> std::optional<std::string> { return std::any_cast<bool>(a) ? std::string("true") : std::string("false"); }},
+            {std::type_index(typeid(std::wstring)),
+             [](const std::any& a) -> std::optional<std::string> { return wstringToUtf8(std::any_cast<std::wstring>(a)); }},
+            {std::type_index(typeid(wchar_t*)),
+             [](const std::any& a) -> std::optional<std::string> { return wstringToUtf8(std::any_cast<wchar_t*>(a)); }},
+            {std::type_index(typeid(const wchar_t*)),
+             [](const std::any& a) -> std::optional<std::string> { return wstringToUtf8(std::any_cast<const wchar_t*>(a)); }},
+        };
+        return map;
+    }
+
+    inline std::optional<std::string> anyToString(const char* /*fileName*/, int /*fileLine*/,
+                                                  const char* /*function*/, const std::any& data)
     {
         if (!data.has_value())
-        {
             return std::nullopt;
-        }
         if (data.type() == typeid(nullptr))
-        {
             return std::nullopt;
-        }
-        if (data.type() == typeid(std::string))
-        {
-            return std::any_cast<std::string>(data);
-        }
-        if (data.type() == typeid(std::string &))
-        {
-            return std::any_cast<std::string>(data);
-        }
-        if (data.type() == typeid(const std::string &))
-        {
-            return std::any_cast<std::string>(data);
-        }
-        if (data.type() == typeid(const char*)) // 添加对 const char* 的支持
-        {
-            return std::any_cast<const char*>(data); // 直接返回字符串
-        }
-        if (data.type() == typeid(long)) // 添加对 const char* 的支持
-        {
-            return std::to_string(std::any_cast<long>(data));
-        }
-        if (data.type() == typeid(long long)) // 添加对 const char* 的支持
-        {
-            return std::to_string(std::any_cast<long long>(data));
-        }
-        if (data.type() == typeid(char*))
-        {
-            return std::any_cast<char*>(data);
-        }
-        if (data.type() == typeid(int))
-        {
-            return std::to_string(std::any_cast<int>(data));
-        }
-        if (data.type() == typeid(unsigned int))
-        {
-            return std::to_string(std::any_cast<unsigned int>(data));
-        }
-        if (data.type() == typeid(float))
-        {
-            return std::to_string(std::any_cast<float>(data));
-        }
-        if (data.type() == typeid(double))
-        {
-            return floatingNumToString(std::any_cast<double>(data));
-        }
-        if (data.type() == typeid(std::wstring))
-        {
-            std::wstring_convert<std::codecvt_utf8_utf16<wchar_t> > converter;
-            std::string utf8String = converter.to_bytes(std::any_cast<std::wstring>(data));
-            return utf8String;
-        }
-        if (data.type() == typeid(wchar_t*))
-        {
-            std::wstring wStr = std::any_cast<wchar_t*>(data);
-            std::wstring_convert<std::codecvt_utf8<wchar_t> > converter;
-            std::string utf8String = converter.to_bytes(wStr);
-            return utf8String;
-        }
-        if (data.type() == typeid(const wchar_t*))
-        {
-            std::wstring wStr = std::any_cast<const wchar_t*>(data);
-            std::wstring_convert<std::codecvt_utf8<wchar_t> > converter;
-            std::string utf8String = converter.to_bytes(wStr);
-            return utf8String;
-        }
-        if (data.type() == typeid(size_t))
-        {
-            return std::to_string(std::any_cast<size_t>(data));
-        }
-        if (data.type() == typeid(bool))
-        {
-            if (std::any_cast<bool>(data)) return "true";
-            return "false";
-        }
-        if (data.type() == typeid(uint64_t))
-        {
-            return std::to_string(std::any_cast<uint64_t>(data));
-        }
-        // if (data.type() == typeid(QString))
-        // {
-        // 	return std::any_cast<QString>(data).toStdString();
-        // }
-        // if (data.type() == typeid(QColor))
-        // {
-        // 	QColor color = std::any_cast<QColor>(data);
-        // 	return QString("rgba(%1, %2, %3,%4)")
-        // 			.arg(color.red())
-        // 			.arg(color.green())
-        // 			.arg(color.blue())
-        // 			.arg(color.alpha())
-        // 			.toStdString();
-        // 	;
-        // }
-        // if (data.type() == typeid(QStringList))
-        // {
-        // 	auto strList = std::any_cast<QStringList>(data).toStdList();
-        // 	if (strList.empty())
-        // 	{
-        // 		return {};
-        // 	}
-        //
-        // 	std::string str = "(";
-        // 	for (QString i: strList)
-        // 	{
-        // 		str += "\"" + i.toStdString() + "\",";
-        // 	}
-        // 	str.replace(str.end() - 1, str.end(), "");
-        // 	str += ")";
-        // 	return str;
-        // }
-        // if (data.type() == typeid(QByteArray))
-        // {
-        // 	return std::any_cast<QByteArray>(data).toStdString();
-        // }
-        // if (data.type() == typeid(qint64))
-        // {
-        // 	return std::to_string(std::any_cast<qint64>(data));
-        // }
-        // if (data.type() == typeid(QPoint))
-        // {
-        // 	std::string str = "(" + std::to_string(std::any_cast<QPoint>(data).x()) + "," + std::to_string(std::any_cast<QPoint>(data).y()) + ")";
-        // 	return str;
-        // }
-        // if (data.type() == typeid(QPointF))
-        // {
-        // 	std::string str = "(" + floatingNumToString(std::any_cast<QPointF>(data).x()) + "," + floatingNumToString(std::any_cast<QPointF>(data).y()) + ")";
-        // 	return str;
-        // }
+
+        auto& converters = getConverters();
+        auto it = converters.find(std::type_index(data.type()));
+        if (it != converters.end())
+            return it->second(data);
 
         return std::nullopt;
     }
