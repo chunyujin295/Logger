@@ -17,13 +17,14 @@ Logger 是一个基于 spdlog 的 C++ 日志库，支持通过 YAML 配置文件
 - 自动显示文件名、行号、函数名信息
 - 线程安全设计
 - 支持自定义日志格式
+- 支持异步日志（可选，通过配置开启，后台线程写盘，不阻塞调用线程）
 
 ### 1.3 技术栈
 
 - **编程语言**：C++17
 - **构建系统**：CMake 3.21+
 - **核心依赖**：
-  - spdlog 1.16.0（日志库）
+  - spdlog 1.17.0（日志库，可通过 CMake 选项 `SPDLOG_VERSION` 切换为 1.16.0）
   - yaml-tool 1.1.1（YAML 配置解析）
   - yaml-cpp（YAML 底层库）
 
@@ -32,7 +33,8 @@ Logger 是一个基于 spdlog 的 C++ 日志库，支持通过 YAML 配置文件
 ```
 Logger/
 ├── 3rd/                          # 第三方库
-│   └── spdlog-1.16.0/           # spdlog 日志库
+│   ├── spdlog-1.16.0/           # spdlog 日志库（1.16.0）
+│   └── spdlog-1.17.0/           # spdlog 日志库（1.17.0，默认）
 ├── cmake/                        # CMake 配置文件
 │   ├── vendor/                  # CPM.cmake 包管理器
 │   ├── 3rd.cmake                # 第三方库配置
@@ -154,6 +156,9 @@ LOG_INFO("Application started!");
 LOG_DEBUG("Variable value: ", value);
 LOG_WARN("Warning message");
 LOG_ERROR("Error occurred: ", error_msg);
+
+// 程序退出前调用（开启异步时必须调用，同步模式可选）
+Logger::shutdown();
 ```
 
 ### 5.2 日志级别说明
@@ -189,6 +194,9 @@ logger:
   release_level: info            # Release 模式过滤级别
   flush_on: trace               # 立即刷新级别
   pattern: "[%Y-%m-%d %H:%M:%S.%e][%n][%^%l%$][thread %t]%v"
+  async: false                  # 是否开启异步日志（默认 false）
+  async_queue_size: 8192        # 异步队列容量（仅 async=true 时有效）
+  async_thread_count: 1         # 异步写盘线程数（仅 async=true 时有效）
 
 showCodeLine:                   # 是否显示代码位置信息
   trace: false
@@ -251,7 +259,25 @@ spdlog 滚动日志设计理念：
 
 > 不带后缀的 `xxx.log` 表示"正在写的现在"，带 `.1/.2/...` 后缀的表示"已经封存的过去"。
 
-### 5.6 回调函数使用
+### 5.6 异步日志
+
+异步模式下，日志消息先写入内存队列，后台线程再从队列中取出并写入磁盘。调用线程不会被磁盘 I/O 阻塞，适合高频日志场景。
+
+**开启方式**：在配置文件的 `logger` 节点中设置：
+
+```yaml
+logger:
+  async: true              # 开启异步
+  async_queue_size: 8192   # 队列大小（默认 8192）
+  async_thread_count: 1    # 后台写线程数（默认 1）
+```
+
+**注意事项**：
+- 异步模式下**必须**在 `main()` 退出前调用 `Logger::shutdown()`，否则队列中未处理的日志会丢失
+- 程序异常崩溃时，异步队列中的日志无法保证落盘，对 crash 场景有强要求的建议保持同步模式
+- 不设置 `async: true`（或设为 `false`）时，日志为同步模式，无需调用 `shutdown()`
+
+### 5.7 回调函数使用
 
 ```cpp
 // 添加回调函数
@@ -326,14 +352,15 @@ target_link_libraries(your_target PRIVATE Logger::Logger)
 
 1. **配置文件**：默认配置文件会自动生成，用户可自定义修改
 2. **线程安全**：所有 sink 都使用多线程安全版本（_mt 后缀）
-3. **性能考虑**：生产环境建议将日志级别设置为 INFO 或更高
-4. **日志滚动**：滚动日志文件数量必须为非零正整数
-5. **路径检查**：日志文件路径不存在时会自动创建
+3. **性能考虑**：生产环境建议将日志级别设置为 INFO 或更高；高频日志场景建议开启异步模式
+4. **异步退出**：开启异步日志后，必须在程序退出前调用 `Logger::shutdown()` 确保日志落盘
+5. **日志滚动**：滚动日志文件数量必须为非零正整数
+6. **路径检查**：日志文件路径不存在时会自动创建
 
 ## 9. 版本历史
 
 - **v1.0.0**：初始版本
-  - 基于 spdlog 1.16.0
+  - 基于 spdlog 1.16.0（现已默认升级到 1.17.0，可通过 CMake 选项 `SPDLOG_VERSION` 切换）
   - 支持 YAML 配置文件
   - 支持多种 sink 类型
   - 支持日志回调函数

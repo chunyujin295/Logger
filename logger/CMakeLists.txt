@@ -5,7 +5,8 @@ add_library(${PROJECT_NAME} SHARED)
 
 target_compile_definitions(${PROJECT_NAME}
         PRIVATE LOGGER_BUILDING_LIBRARY
-) # 定义导出宏
+        PRIVATE SPDLOG_ASYNC
+) # 定义导出宏，启用spdlog异步日志支持
 
 file(GLOB_RECURSE srcs CONFIGURE_DEPENDS
         "src/*.cpp"

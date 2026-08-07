@@ -6,6 +6,8 @@
 #include "yamltool/yamltool.h"
 
 // #include <QColor>
+#include <spdlog/async.h>
+#include <spdlog/async_logger.h>
 #include <spdlog/logger.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/callback_sink.h>
@@ -302,6 +304,11 @@ void LogPrivate::removeCallBackSink(const std::string& sinkId)
     }
 }
 
+void LogPrivate::shutdown()
+{
+    spdlog::shutdown();
+}
+
 LogPrivate::LogPrivate()
 {
     // 设置全局错误处理程序
@@ -378,6 +385,21 @@ void LogPrivate::loadConfigFile(const std::string& configFilePath)
     auto logPatternStr = YamlTool::YamlTool::getDef<std::string>(loggerNode, "pattern",
                                                                  "[%Y-%m-%d %H:%M:%S.%e][%n][%^%l%$][thread %t]%v");
 
+    // 获取异步日志配置（防御性读取，兼容旧版配置文件缺失这些 key 的情况）
+    bool asyncEnabled = false;
+    int asyncQueueSize = 8192;
+    int asyncThreadCount = 1;
+    try {
+        auto asyncStr = YamlTool::YamlTool::getDef<std::string>(loggerNode, "async", "false");
+        asyncEnabled = (asyncStr == "true" || asyncStr == "1");
+    } catch (...) {}
+    try {
+        asyncQueueSize = std::stoi(YamlTool::YamlTool::getDef<std::string>(loggerNode, "async_queue_size", "8192"));
+    } catch (...) {}
+    try {
+        asyncThreadCount = std::stoi(YamlTool::YamlTool::getDef<std::string>(loggerNode, "async_thread_count", "1"));
+    } catch (...) {}
+
     // 获取各级别日志是否按照输出格式输出
     YamlTool::YamlNode showCodeLineNode = YamlTool::YamlTool::getNode(logConfigNode, "showCodeLine");
     if (showCodeLineNode.isDefined() && !showCodeLineNode.isNull())
@@ -403,7 +425,12 @@ void LogPrivate::loadConfigFile(const std::string& configFilePath)
         {
             auto consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>(); // 创建控制台sink
             consoleSink->set_pattern(logPatternStr);
-            this->m_logger = std::make_shared<spdlog::logger>("console", consoleSink);
+            if (asyncEnabled) {
+                spdlog::init_thread_pool(asyncQueueSize, asyncThreadCount);
+                this->m_logger = std::make_shared<spdlog::async_logger>("console", consoleSink, spdlog::thread_pool());
+            } else {
+                this->m_logger = std::make_shared<spdlog::logger>("console", consoleSink);
+            }
             std::cout << "[LogPrivate] LogPrivate not set Sink, used default: console!" << std::endl;
         }
         else
@@ -540,10 +567,15 @@ void LogPrivate::loadConfigFile(const std::string& configFilePath)
                 }
             }
         }
-        this->m_logger = std::make_shared<spdlog::logger>(loggerName);
-        for (const auto& sink: sinks)
-        {
-            this->m_logger->sinks().push_back(sink);
+        if (asyncEnabled) {
+            spdlog::init_thread_pool(asyncQueueSize, asyncThreadCount);
+            this->m_logger = std::make_shared<spdlog::async_logger>(loggerName, sinks.begin(), sinks.end(), spdlog::thread_pool());
+        } else {
+            this->m_logger = std::make_shared<spdlog::logger>(loggerName);
+            for (const auto& sink: sinks)
+            {
+                this->m_logger->sinks().push_back(sink);
+            }
         }
     }
 
@@ -585,6 +617,10 @@ void LogPrivate::loadDefaultConfig(const std::string& configFilePath)
     std::string releaseLevel = "info";
     std::string flushOn = "trace";
     std::string logPatternStr = "[%Y-%m-%d %H:%M:%S.%e][%n][%^%l%$][thread %t]%v";
+
+    std::string asyncEnabled = "false";
+    std::string asyncQueueSize = "8192";
+    std::string asyncThreadCount = "1";
 
     std::string traceShowLine = "false";
     std::string debugShowLine = "false";
@@ -646,6 +682,9 @@ void LogPrivate::loadDefaultConfig(const std::string& configFilePath)
     YamlTool::YamlTool::setDef<std::string>(loggerNode, "release_level", releaseLevel);
     YamlTool::YamlTool::setDef<std::string>(loggerNode, "flush_on", flushOn);
     YamlTool::YamlTool::setDef<std::string>(loggerNode, "pattern", logPatternStr);
+    YamlTool::YamlTool::setDef<std::string>(loggerNode, "async", asyncEnabled);
+    YamlTool::YamlTool::setDef<std::string>(loggerNode, "async_queue_size", asyncQueueSize);
+    YamlTool::YamlTool::setDef<std::string>(loggerNode, "async_thread_count", asyncThreadCount);
 
     YamlTool::YamlTool::setDef<std::string>(showCodeLineNode, "trace", traceShowLine);
     YamlTool::YamlTool::setDef<std::string>(showCodeLineNode, "debug", debugShowLine);

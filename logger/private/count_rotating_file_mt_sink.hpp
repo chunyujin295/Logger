@@ -23,6 +23,7 @@
 #include <filesystem>
 #include <fstream>
 #include <mutex>
+#include <spdlog/details/file_helper.h>
 #include <spdlog/sinks/base_sink.h>
 #include <string>
 #include <vector>
@@ -120,13 +121,7 @@ namespace CustomSink
 			spdlog::memory_buf_t buf;
 			this->formatter_->format(msg, buf);
 
-			// 去掉尾部换行符，避免重复换行
-			size_t size = buf.size();
-			while (size > 0 && (buf[size - 1] == '\n' || buf[size - 1] == '\r'))
-				--size;
-
-			file_.write(buf.data(), static_cast<std::streamsize>(size));
-			file_.put('\n');
+			file_helper_.write(buf);
 
 			++log_count_;
 
@@ -139,8 +134,7 @@ namespace CustomSink
 
 		void flush_() override
 		{
-			if (file_.is_open())
-				file_.flush();
+			file_helper_.flush();
 		}
 
 	private:
@@ -218,14 +212,14 @@ namespace CustomSink
 
 		void ensure_opened_for_write_()
 		{
-			if (opened_ && file_.is_open())
+			if (opened_)
 				return;
 
 			// strict：决定打开 stem.log 前要不要先滚动 & 初始化 log_count_
 			adjust_for_strict_on_open_();
 
 			const fs::path filename = base_path_();
-			file_.open(filename.string(), std::ios::out | std::ios::app);
+			file_helper_.open(filename.string());
 			opened_ = true;
 		}
 
@@ -234,11 +228,7 @@ namespace CustomSink
 		// 不打开新 base（懒创建，下一条写入才会打开）
 		void rotate_files_()
 		{
-			if (file_.is_open())
-			{
-				file_.flush();
-				file_.close();
-			}
+			file_helper_.close();
 			opened_ = false;
 			log_count_ = 0;
 
@@ -286,7 +276,7 @@ namespace CustomSink
 		}
 
 	private:
-		std::ofstream file_;
+		spdlog::details::file_helper file_helper_;
 
 		fs::path dir_;
 		std::string stem_;

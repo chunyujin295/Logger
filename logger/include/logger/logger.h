@@ -129,6 +129,12 @@ public:
 	 * @param sinkId 回调日志id
 	 */
 	static void removeCallBack(const std::string& sinkId);
+
+	/**
+	 * 关闭日志系统，等待异步队列排空后释放所有资源
+	 * 应在 main() 结束前调用，确保所有日志被写出
+	 */
+	static void shutdown();
 };
 
 // 通过宏定义方式调用日志输出：

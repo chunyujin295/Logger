@@ -23,7 +23,6 @@
 #include <chrono>
 #include <ctime>
 #include <filesystem>
-#include <fstream>
 #include <iomanip>
 #include <mutex>
 #include <sstream>
@@ -32,6 +31,7 @@
 #include <string_view>
 #include <system_error>
 
+#include <spdlog/details/file_helper.h>
 #include <spdlog/sinks/base_sink.h>
 
 namespace CustomSink
@@ -311,29 +311,16 @@ protected:
         spdlog::memory_buf_t buf;
         this->formatter_->format(msg, buf);
 
-        size_t sz = buf.size();
-        while (sz > 0 && (buf[sz - 1] == '\n' || buf[sz - 1] == '\r')) --sz;
+        const uint64_t will_write = static_cast<uint64_t>(buf.size());
 
-        const uint64_t will_write = static_cast<uint64_t>(sz) + 1; // + '\n'
+        // 5) 写前 size 滚动（预判式）：如果写入后会超出容量，先滚动
+        if (max_files_ > 0 && (current_size_bytes_ + will_write > max_size_bytes_))
+        {
+            rotate_by_size_chain_();
+            ensure_opened_for_write_();
+        }
 
-        // 5) 写前 size 滚动（预判式）：仅当 max_files_ > 0 才启用。
-        // 如果当前条日志写入前，文件超出容量 或 当前日志写入后会超出容量，则触发滚动。这是spdlog推荐的做法
-        // if (max_files_ > 0 && (current_size_bytes_ + will_write > max_size_bytes_))
-        // {
-        //     rotate_by_size_chain_();
-        //     ensure_opened_for_write_();
-        // }
-
-    	// 5) 写前 size 滚动（非预判式）：仅当 max_files_ > 0 才启用
-    	// 语义：只在“当前文件已超限”时才滚动；不考虑本次写入会不会把它写爆。
-    	if (max_files_ > 0 && current_size_bytes_ > max_size_bytes_)
-    	{
-    		rotate_by_size_chain_();
-    		ensure_opened_for_write_();
-    	}
-
-        file_.write(buf.data(), static_cast<std::streamsize>(sz));
-        file_.put('\n');
+        file_helper_.write(buf);
         current_size_bytes_ += will_write;
 
         // 6) 关键：写后不滚动（保证无后缀当前文件始终存在）
@@ -341,8 +328,7 @@ protected:
 
     void flush_() override
     {
-        if (file_.is_open())
-            file_.flush();
+        file_helper_.flush();
     }
 
 private:
@@ -420,32 +406,19 @@ private:
 
     void ensure_opened_for_write_()
     {
-        if (opened_ && file_.is_open())
+        if (opened_)
             return;
 
         const fs::path p = current_base_path_();
-        file_.open(p.string(), std::ios::out | std::ios::app | std::ios::binary);
+        file_helper_.open(p.string());
         opened_ = true;
 
-        std::error_code ec;
-        if (fs::exists(p, ec) && !ec)
-        {
-            auto sz = fs::file_size(p, ec);
-            current_size_bytes_ = (!ec ? static_cast<uint64_t>(sz) : 0);
-        }
-        else
-        {
-            current_size_bytes_ = 0;
-        }
+        current_size_bytes_ = static_cast<uint64_t>(file_helper_.size());
     }
 
     void close_file_()
     {
-        if (file_.is_open())
-        {
-            file_.flush();
-            file_.close();
-        }
+        file_helper_.close();
         opened_ = false;
         current_size_bytes_ = 0;
     }
@@ -492,7 +465,7 @@ private:
     }
 
 private:
-    std::ofstream file_;
+    spdlog::details::file_helper file_helper_;
 
     fs::path dir_;
     std::string name_pattern_;

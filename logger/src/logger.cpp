@@ -44,3 +44,8 @@ void Logger::removeCallBack(const std::string& sinkId)
 {
 	LogPrivate::removeCallBackSink(sinkId);
 }
+
+void Logger::shutdown()
+{
+	LogPrivate::shutdown();
+}

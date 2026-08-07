@@ -128,6 +128,12 @@ public:
 	 */
 	static void removeCallBackSink(const std::string& sinkId);
 
+	/**
+	 * 关闭日志系统，等待异步队列排空后释放所有资源
+	 * 应在 main() 结束前调用，确保所有日志被写出
+	 */
+	static void shutdown();
+
 private:
 	/**
      * 构造
